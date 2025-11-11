@@ -9,6 +9,8 @@ from memory_manager import MemoryManager
 from orchestrator import Orchestrator
 from model_exporter import ModelExporter
 from sync_manager import SyncManager
+from web_fetcher import WebFetcher
+from audit_logger import AuditLogger
 import logging
 
 # Configure logging
@@ -31,11 +33,14 @@ memory_manager = MemoryManager(db_path="memory/brein_memory.db")
 orchestrator = Orchestrator(memory_manager)
 model_exporter = ModelExporter()
 sync_manager = SyncManager()
+web_fetcher = WebFetcher(memory_manager)
+audit_logger = AuditLogger()
 
 # Pydantic models for API requests
 class QueryRequest(BaseModel):
     query: str
     session_id: str = "default"
+    enable_web_access: bool = False
 
 class IngestRequest(BaseModel):
     content: str
@@ -51,6 +56,15 @@ class SyncDeltaRequest(BaseModel):
     device_id: str
     since_version: int = 0
 
+class WebFetchRequest(BaseModel):
+    url: str
+    enable_web_access: bool = False
+
+class QuarantineReviewRequest(BaseModel):
+    quarantine_path: str
+    approved: bool
+    reviewer_notes: str = ""
+
 @app.get("/api/health")
 async def health_check():
     """Basic health check endpoint"""
@@ -58,8 +72,30 @@ async def health_check():
 
 @app.post("/api/query")
 async def handle_query(request: QueryRequest):
-    """Handle user queries with memory augmentation"""
-    return await orchestrator.process_query(request.query, request.session_id)
+    """Handle user queries with memory augmentation and optional web access"""
+    # Audit log the query operation
+    audit_logger.log_operation(
+        operation_type="user_query",
+        user_id="user",  # In production, get from auth
+        session_id=request.session_id,
+        details={
+            "query_length": len(request.query),
+            "web_access_requested": request.enable_web_access
+        }
+    )
+
+    result = await orchestrator.process_query(request.query, request.session_id, request.enable_web_access)
+
+    # Log memory operations if any
+    if result.get("memory_chunks"):
+        audit_logger.log_memory_operation(
+            operation="retrieve",
+            node_ids=[chunk["node_id"] for chunk in result["memory_chunks"]],
+            user_id="user",
+            session_id=request.session_id
+        )
+
+    return result
 
 @app.post("/api/ingest")
 async def ingest_content(request: IngestRequest):
@@ -118,6 +154,113 @@ async def create_offline_bundle(device_id: str, max_nodes: int = 1000):
         return {"success": True, "bundle_path": bundle_path}
     else:
         raise HTTPException(status_code=500, detail="Failed to create offline bundle")
+
+# Web fetch endpoints
+@app.post("/api/web/fetch")
+async def fetch_web_content(request: WebFetchRequest):
+    """Fetch and process web content through safety pipeline"""
+    if not request.enable_web_access:
+        # Log security event for denied web access
+        audit_logger.log_security_event(
+            event_type="web_access_denied",
+            severity="low",
+            source="api_call",
+            details={"url": request.url, "reason": "web_access_disabled"}
+        )
+        raise HTTPException(status_code=403, detail="Web access is disabled for this query")
+
+    # Log web fetch operation
+    audit_logger.log_operation(
+        operation_type="web_fetch_request",
+        user_id="user",
+        details={"url": request.url}
+    )
+
+    result = web_fetcher.fetch_and_process_pipeline(request.url)
+
+    # Log the fetch result
+    audit_logger.log_web_fetch(
+        url=request.url,
+        success=result.get("success", False),
+        safety_warnings=result.get("safety_warnings", []),
+        quarantine_path=result.get("quarantine_path"),
+        user_id="user"
+    )
+
+    return result
+
+@app.post("/api/web/review")
+async def review_quarantined_content(request: QuarantineReviewRequest):
+    """Review and approve/reject quarantined content"""
+    # Log content review operation
+    audit_logger.log_operation(
+        operation_type="content_review",
+        user_id="reviewer",  # In production, get from auth
+        details={
+            "quarantine_path": request.quarantine_path,
+            "approved": request.approved,
+            "reviewer_notes": request.reviewer_notes
+        }
+    )
+
+    success = web_fetcher.approve_quarantined_content(
+        request.quarantine_path,
+        request.approved,
+        request.reviewer_notes
+    )
+
+    # Log the review result
+    audit_logger.log_content_review(
+        quarantine_path=request.quarantine_path,
+        approved=request.approved,
+        reviewer_id="reviewer",
+        notes=request.reviewer_notes
+    )
+
+    return {"success": success}
+
+@app.get("/api/web/quarantine/stats")
+async def get_quarantine_stats():
+    """Get quarantine statistics"""
+    return web_fetcher.get_quarantine_stats()
+
+@app.get("/api/web/quarantine/list")
+async def list_quarantined_content():
+    """List all quarantined content for review"""
+    import os
+    quarantine_files = []
+
+    if os.path.exists("quarantine"):
+        for filename in os.listdir("quarantine"):
+            if filename.endswith('.json'):
+                filepath = os.path.join("quarantine", filename)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        quarantine_files.append({
+                            "filename": filename,
+                            "path": filepath,
+                            "url": data["fetch_result"]["url"],
+                            "title": data["fetch_result"]["title"],
+                            "status": data.get("status", "pending_review"),
+                            "quarantine_timestamp": data["quarantine_timestamp"],
+                            "word_count": data["fetch_result"]["metadata"]["word_count"]
+                        })
+                except Exception as e:
+                    logger.error(f"Error reading quarantine file {filename}: {e}")
+
+    return {"quarantined_content": quarantine_files}
+
+# Audit endpoints
+@app.get("/api/audit/summary")
+async def get_audit_summary(days: int = 7):
+    """Get audit summary for the specified period"""
+    return audit_logger.get_audit_summary(days)
+
+@app.post("/api/audit/search")
+async def search_audit_logs(query: Dict[str, Any], log_type: str = "all", limit: int = 100):
+    """Search audit logs"""
+    return {"results": audit_logger.search_logs(query, log_type, limit)}
 
 # Model export endpoints
 @app.post("/api/models/export-mobile-bundle")

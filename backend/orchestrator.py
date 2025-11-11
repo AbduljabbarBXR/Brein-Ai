@@ -30,13 +30,14 @@ class Orchestrator:
 
         self.session_context = {}  # Enhanced session storage
 
-    async def process_query(self, query: str, session_id: Optional[str] = None) -> Dict:
+    async def process_query(self, query: str, session_id: Optional[str] = None, enable_web_access: bool = False) -> Dict:
         """
-        Process a user query using multi-agent architecture.
+        Process a user query using multi-agent architecture with optional web access.
 
         Args:
             query: User query string
             session_id: Optional session identifier
+            enable_web_access: Whether to allow web fetching for this query
 
         Returns:
             Dictionary with response, thought_trace, memory_chunks, and metadata
@@ -71,7 +72,8 @@ class Orchestrator:
                 "memory_stats": self.memory.get_memory_stats(),
                 "reasoning_metadata": cortex_result["reasoning_metadata"],
                 "agents_used": ["cortex", "basal_ganglia"],
-                "policy_decision": policy_decision
+                "policy_decision": policy_decision,
+                "web_access_enabled": enable_web_access
             }
 
         except Exception as e:
