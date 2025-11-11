@@ -11,6 +11,8 @@ from model_exporter import ModelExporter
 from sync_manager import SyncManager
 from web_fetcher import WebFetcher
 from audit_logger import AuditLogger
+from test_harness import TestHarness
+from profiler import PerformanceProfiler
 import logging
 
 # Configure logging
@@ -35,6 +37,8 @@ model_exporter = ModelExporter()
 sync_manager = SyncManager()
 web_fetcher = WebFetcher(memory_manager)
 audit_logger = AuditLogger()
+test_harness = TestHarness(memory_manager, orchestrator)
+performance_profiler = PerformanceProfiler()
 
 # Pydantic models for API requests
 class QueryRequest(BaseModel):
@@ -261,6 +265,57 @@ async def get_audit_summary(days: int = 7):
 async def search_audit_logs(query: Dict[str, Any], log_type: str = "all", limit: int = 100):
     """Search audit logs"""
     return {"results": audit_logger.search_logs(query, log_type, limit)}
+
+# Testing and profiling endpoints
+@app.post("/api/test/run-comprehensive")
+async def run_comprehensive_test():
+    """Run comprehensive test suite"""
+    results = await test_harness.run_comprehensive_test()
+    return results
+
+@app.post("/api/test/benchmark")
+async def run_performance_benchmark(iterations: int = 100):
+    """Run performance benchmark"""
+    results = await test_harness.run_performance_benchmark(iterations)
+    return results
+
+@app.post("/api/profiler/start")
+async def start_performance_monitoring():
+    """Start performance monitoring"""
+    performance_profiler.start_monitoring()
+    return {"status": "started"}
+
+@app.post("/api/profiler/stop")
+async def stop_performance_monitoring():
+    """Stop performance monitoring"""
+    performance_profiler.stop_monitoring()
+    return {"status": "stopped"}
+
+@app.get("/api/profiler/current")
+async def get_current_performance_metrics():
+    """Get current performance metrics"""
+    return performance_profiler.get_current_metrics()
+
+@app.get("/api/profiler/summary")
+async def get_performance_summary(hours: int = 1):
+    """Get performance summary for the last N hours"""
+    return performance_profiler.get_performance_summary(hours)
+
+@app.get("/api/profiler/operations")
+async def get_operation_performance(operation: Optional[str] = None, hours: int = 1):
+    """Get operation performance metrics"""
+    return performance_profiler.get_operation_performance(operation, hours)
+
+@app.get("/api/profiler/health")
+async def get_system_health():
+    """Get system health status"""
+    return performance_profiler.get_health_status()
+
+@app.post("/api/profiler/report")
+async def generate_performance_report():
+    """Generate and save performance report"""
+    filepath = performance_profiler.save_performance_report()
+    return {"report_path": filepath}
 
 # Model export endpoints
 @app.post("/api/models/export-mobile-bundle")
