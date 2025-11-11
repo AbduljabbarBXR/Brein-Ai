@@ -6,6 +6,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from memory_manager import MemoryManager
 from memory_transformer import MemoryTransformer
+from agents import HippocampusAgent, CortexAgent, BasalGangliaAgent
+from neural_mesh import NeuralMesh
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,16 +15,24 @@ logger = logging.getLogger(__name__)
 class Orchestrator:
     """
     Orchestrator for Brein AI - coordinates between memory, agents, and user queries.
+    Now uses multi-agent architecture with specialized agents.
     """
 
     def __init__(self, memory_manager: MemoryManager):
         self.memory = memory_manager
         self.memory_transformer = MemoryTransformer()
-        self.session_context = {}  # Simple session storage
+        self.neural_mesh = NeuralMesh()
+
+        # Initialize agents
+        self.hippocampus = HippocampusAgent(memory_manager)
+        self.cortex = CortexAgent(memory_manager, self.memory_transformer)
+        self.basal_ganglia = BasalGangliaAgent(memory_manager, self.neural_mesh)
+
+        self.session_context = {}  # Enhanced session storage
 
     async def process_query(self, query: str, session_id: Optional[str] = None) -> Dict:
         """
-        Process a user query and return response with memory context and thought trace.
+        Process a user query using multi-agent architecture.
 
         Args:
             query: User query string
@@ -32,56 +42,36 @@ class Orchestrator:
             Dictionary with response, thought_trace, memory_chunks, and metadata
         """
         try:
-            # Search memory for relevant context
-            memory_results = self.memory.search_memory(query, top_k=5, use_mesh_expansion=True)
+            # Get session context for continuity
+            session_history = self.get_session_context(session_id) if session_id else None
 
-            # Extract memory chunks and embeddings for thought generation
-            memory_chunks = []
-            memory_embeddings = []
+            # Use Cortex Agent for reasoning and response generation
+            cortex_result = await self.cortex.process_query(query, session_history)
 
-            for result in memory_results:
-                memory_chunks.append({
-                    "content": result["content"],
-                    "score": result["score"],
-                    "type": result["type"]
-                })
+            # Extract memory node IDs for reinforcement
+            memory_node_ids = [chunk["node_id"] for chunk in cortex_result.get("memory_chunks", [])]
 
-                # Get embedding from database for thought generation
-                conn = self.memory.conn if hasattr(self.memory, 'conn') else None
-                if conn is None:
-                    import sqlite3
-                    conn = sqlite3.connect(self.memory.db_path)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT embedding FROM nodes WHERE node_id = ?", (result["node_id"],))
-                    row = cursor.fetchone()
-                    if row and row[0]:
-                        import pickle
-                        embedding = pickle.loads(row[0])
-                        memory_embeddings.append(embedding)
-                    conn.close()
+            # Apply reinforcement learning via Basal Ganglia
+            if memory_node_ids:
+                await self.basal_ganglia.reinforce_memory(memory_node_ids, cortex_result.get("confidence", 0.5))
 
-            # Generate thought trace using memory transformer
-            thought_result = self.memory_transformer.generate_thought_trace(memory_embeddings, query)
+            # Get policy decisions
+            policy_decision = self.basal_ganglia.get_policy_decision("query", cortex_result.get("memory_chunks", []))
 
-            # Generate response based on memory context
-            response = self._generate_response_with_memory(query, memory_chunks, thought_result)
-
-            # Store conversation in memory
+            # Store conversation in session context
             if session_id:
-                self._store_conversation(session_id, query, response, memory_results)
+                self._store_conversation(session_id, query, cortex_result["response"], cortex_result.get("memory_chunks", []))
 
             return {
-                "response": response,
-                "thought_trace": thought_result["thought_trace"],
-                "confidence": thought_result["confidence"],
-                "memory_chunks": memory_chunks,
+                "response": cortex_result["response"],
+                "thought_trace": cortex_result["thought_trace"],
+                "confidence": cortex_result["confidence"],
+                "memory_chunks": cortex_result["memory_chunks"],
                 "session_id": session_id or "default",
                 "memory_stats": self.memory.get_memory_stats(),
-                "reasoning_metadata": {
-                    "activated_nodes": thought_result["activated_nodes"],
-                    "reasoning_type": thought_result["reasoning_type"],
-                    "model_used": thought_result.get("model_used", "unknown")
-                }
+                "reasoning_metadata": cortex_result["reasoning_metadata"],
+                "agents_used": ["cortex", "basal_ganglia"],
+                "policy_decision": policy_decision
             }
 
         except Exception as e:
@@ -109,13 +99,13 @@ class Orchestrator:
 
         return f"Based on my memory and feeling {confidence_text} about this: {top_chunk['content'][:200]}...{thought_insight}"
 
-    def _store_conversation(self, session_id: str, query: str, response: str, memory_results: List[Dict]):
+    def _store_conversation(self, session_id: str, query: str, response: str, memory_chunks: List[Dict]):
         """
-        Store conversation data for session tracking.
+        Store conversation data for session tracking with enhanced context.
         """
-        memory_node_ids = [result["node_id"] for result in memory_results]
+        memory_node_ids = [chunk["node_id"] for chunk in memory_chunks]
 
-        # For now, we'll store this in memory - in production this would go to a proper conversation store
+        # Enhanced session storage with agent metadata
         if session_id not in self.session_context:
             self.session_context[session_id] = []
 
@@ -123,7 +113,9 @@ class Orchestrator:
             "query": query,
             "response": response,
             "memory_nodes": memory_node_ids,
-            "timestamp": "now"  # Would use proper datetime in production
+            "memory_count": len(memory_chunks),
+            "timestamp": "now",  # Would use proper datetime in production
+            "agents_used": ["cortex", "basal_ganglia"]  # Track which agents processed this
         })
 
         # Keep only last 10 exchanges per session
@@ -132,7 +124,7 @@ class Orchestrator:
 
     async def ingest_content(self, content: str, content_type: str = "stable") -> Dict:
         """
-        Ingest new content into memory.
+        Ingest new content into memory using Hippocampus Agent.
 
         Args:
             content: Content to ingest
@@ -142,19 +134,18 @@ class Orchestrator:
             Dictionary with node_id and status
         """
         try:
-            # Chunk the content if it's long
-            chunks = self.memory.chunk_text(content)
+            # Use Hippocampus Agent for ingestion
+            result = await self.hippocampus.ingest_content(content, content_type)
 
-            node_ids = []
-            for chunk in chunks:
-                node_id = self.memory.add_memory(chunk, content_type)
-                node_ids.append(node_id)
+            if result["status"] == "error":
+                raise HTTPException(status_code=500, detail=result["error"])
 
             return {
-                "status": "success",
-                "node_ids": node_ids,
-                "chunks_created": len(chunks),
-                "content_type": content_type
+                "status": result["status"],
+                "node_ids": result["node_ids"],
+                "chunks_created": result["chunks_created"],
+                "content_type": result["content_type"],
+                "agents_used": ["hippocampus"]
             }
 
         except Exception as e:
