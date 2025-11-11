@@ -75,3 +75,7 @@ node_modules/
 .env
 .env.local
 .env.production
+
+# Project documentation (keep local only)
+SPRINT.md
+Brein.md

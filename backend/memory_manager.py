@@ -8,6 +8,8 @@ import pickle
 import json
 from datetime import datetime
 import sys
+from collections import OrderedDict
+import threading
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from neural_mesh import NeuralMesh
@@ -18,19 +20,25 @@ class MemoryManager:
     Uses FAISS for vector similarity search and SQLite for metadata storage.
     """
 
-    def __init__(self, db_path: str = "memory/brein_memory.db", embedding_model: str = "all-MiniLM-L6-v2"):
+    def __init__(self, db_path: str = "memory/brein_memory.db", embedding_model: str = "all-MiniLM-L6-v2",
+                 max_memory_cache: int = 1000, ssd_cache_path: str = "memory/ssd_cache/"):
         """
-        Initialize the Memory Manager.
+        Initialize the Memory Manager with memory-mapped FAISS and LRU caching.
 
         Args:
             db_path: Path to SQLite database file
             embedding_model: SentenceTransformer model name for embeddings
+            max_memory_cache: Maximum number of embeddings to keep in memory
+            ssd_cache_path: Path for SSD offload cache
         """
         self.db_path = db_path
         self.embedding_model_name = embedding_model
+        self.max_memory_cache = max_memory_cache
+        self.ssd_cache_path = ssd_cache_path
 
-        # Ensure memory directory exists
+        # Ensure directories exist
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        os.makedirs(ssd_cache_path, exist_ok=True)
 
         # Initialize SQLite database
         self._init_database()
@@ -39,10 +47,12 @@ class MemoryManager:
         self.embedding_model = SentenceTransformer(embedding_model)
         self.embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
 
-        # Initialize FAISS index
-        self.index = faiss.IndexFlatIP(self.embedding_dim)  # Inner product (cosine similarity)
-        self.id_to_idx = {}  # Maps node_id to FAISS index
-        self.idx_to_id = {}  # Maps FAISS index to node_id
+        # Initialize memory-mapped FAISS index with SSD offload
+        self._init_memory_mapped_index()
+
+        # LRU cache for embeddings in memory
+        self.embedding_cache = OrderedDict()
+        self.cache_lock = threading.Lock()
 
         # Initialize Neural Mesh
         self.neural_mesh = NeuralMesh()
@@ -80,8 +90,76 @@ class MemoryManager:
             )
         ''')
 
+        # Add memory_type column to nodes table if it doesn't exist
+        try:
+            cursor.execute("ALTER TABLE nodes ADD COLUMN memory_type TEXT DEFAULT 'working'")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
         conn.commit()
         conn.close()
+
+    def _init_memory_mapped_index(self):
+        """Initialize memory-mapped FAISS index for SSD offload."""
+        index_path = os.path.join(self.ssd_cache_path, "faiss_index.idx")
+
+        # Try to load existing memory-mapped index
+        if os.path.exists(index_path):
+            try:
+                self.index = faiss.read_index(index_path)
+                # Convert to memory-mapped if not already
+                if not hasattr(self.index, 'is_mmap'):
+                    faiss.write_index(self.index, index_path)
+                    self.index = faiss.read_index(index_path, faiss.IO_FLAG_MMAP)
+            except Exception as e:
+                print(f"Warning: Could not load existing index: {e}")
+                self.index = faiss.IndexFlatIP(self.embedding_dim)
+        else:
+            # Create new index
+            self.index = faiss.IndexFlatIP(self.embedding_dim)
+
+        self.id_to_idx = {}  # Maps node_id to FAISS index
+        self.idx_to_id = {}  # Maps FAISS index to node_id
+
+    def _save_index_to_disk(self):
+        """Save FAISS index to disk for memory mapping."""
+        index_path = os.path.join(self.ssd_cache_path, "faiss_index.idx")
+        try:
+            faiss.write_index(self.index, index_path)
+        except Exception as e:
+            print(f"Warning: Could not save index to disk: {e}")
+
+    def _get_cached_embedding(self, node_id: str) -> Optional[np.ndarray]:
+        """Get embedding from LRU cache, loading from disk if necessary."""
+        with self.cache_lock:
+            if node_id in self.embedding_cache:
+                # Move to end (most recently used)
+                self.embedding_cache.move_to_end(node_id)
+                return self.embedding_cache[node_id]
+
+            # Load from database if not in cache
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT embedding FROM nodes WHERE node_id = ?", (node_id,))
+            row = cursor.fetchone()
+            conn.close()
+
+            if row and row[0]:
+                embedding = pickle.loads(row[0])
+                self._add_to_cache(node_id, embedding)
+                return embedding
+
+            return None
+
+    def _add_to_cache(self, node_id: str, embedding: np.ndarray):
+        """Add embedding to LRU cache with eviction."""
+        with self.cache_lock:
+            if len(self.embedding_cache) >= self.max_memory_cache:
+                # Remove least recently used
+                evicted_node, _ = self.embedding_cache.popitem(last=False)
+                # Could optionally save evicted items to disk here
+
+            self.embedding_cache[node_id] = embedding
 
     def _load_existing_data(self):
         """Load existing nodes and embeddings from database into FAISS index."""
@@ -113,9 +191,9 @@ class MemoryManager:
         conn.close()
 
     def add_memory(self, content: str, memory_type: str = "conversational",
-                   metadata: Optional[Dict] = None) -> str:
+                    metadata: Optional[Dict] = None) -> str:
         """
-        Add new content to memory.
+        Add new content to memory with memory-mapped storage.
 
         Args:
             content: Text content to store
@@ -140,26 +218,34 @@ class MemoryManager:
         self.id_to_idx[node_id] = idx
         self.idx_to_id[idx] = node_id
 
+        # Add to LRU cache
+        self._add_to_cache(node_id, embedding)
+
         # Add to neural mesh
         self.neural_mesh.add_node(node_id, "memory", metadata)
 
-        # Store in database
+        # Store in database with memory type
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         cursor.execute('''
-            INSERT INTO nodes (node_id, content, type, embedding, metadata)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO nodes (node_id, content, type, embedding, metadata, memory_type)
+            VALUES (?, ?, ?, ?, ?, ?)
         ''', (
             node_id,
             content,
             memory_type,
             pickle.dumps(embedding),
-            json.dumps(metadata) if metadata else None
+            json.dumps(metadata) if metadata else None,
+            "working"  # Default to working memory
         ))
 
         conn.commit()
         conn.close()
+
+        # Save index to disk periodically (every 100 additions)
+        if self.index.ntotal % 100 == 0:
+            self._save_index_to_disk()
 
         return node_id
 
@@ -284,6 +370,9 @@ class MemoryManager:
         cursor.execute("SELECT type, COUNT(*) FROM nodes GROUP BY type")
         type_counts = dict(cursor.fetchall())
 
+        cursor.execute("SELECT memory_type, COUNT(*) FROM nodes GROUP BY memory_type")
+        memory_type_counts = dict(cursor.fetchall())
+
         conn.close()
 
         mesh_stats = self.neural_mesh.get_mesh_stats()
@@ -292,7 +381,11 @@ class MemoryManager:
             "total_nodes": total_nodes,
             "vector_dimension": self.embedding_dim,
             "index_size": self.index.ntotal,
+            "cache_size": len(self.embedding_cache),
+            "max_cache_size": self.max_memory_cache,
+            "ssd_cache_path": self.ssd_cache_path,
             "type_distribution": type_counts,
+            "memory_type_distribution": memory_type_counts,
             "embedding_model": self.embedding_model_name,
             "neural_mesh": mesh_stats
         }
