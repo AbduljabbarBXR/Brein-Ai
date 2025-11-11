@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brein AI - Brain-Inspired AI System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 70vh;
+            padding: 20px;
+        }
+
+        .output-section {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+            margin-bottom: 20px;
+        }
+
+        .output-box {
+            flex: 1;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .output-box h3 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 1.2em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .output-content {
+            flex: 1;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 12px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .input-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .input-group {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #ced4da;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        #user-input:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .status {
+            padding: 8px 12px;
+            background: #d4edda;
+            color: #155724;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #4facfe;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .memory-stats {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 Brein AI</h1>
+            <p>Modular Brain-Inspired AI System</p>
+        </div>
+
+        <div class="chat-container">
+            <div class="output-section">
+                <!-- Box 1: What it Says (Social Response) -->
+                <div class="output-box">
+                    <h3>💬 What it Says</h3>
+                    <div class="output-content" id="response-output">
+                        Welcome to Brein AI! Ask me anything and I'll respond based on my memory and reasoning.
+                    </div>
+                </div>
+
+                <!-- Box 2: What it Thinks (Internal Reasoning) -->
+                <div class="output-box">
+                    <h3>🧠 What it Thinks</h3>
+                    <div class="output-content" id="thought-output">
+                        Internal reasoning and memory retrieval will appear here...
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-section">
+                <div class="input-group">
+                    <input type="text" id="user-input" placeholder="Ask Brein something..." />
+                    <button class="btn btn-primary" onclick="sendQuery()">Send</button>
+                </div>
+                <button class="btn btn-secondary" onclick="clearChat()">Clear</button>
+            </div>
+
+            <div id="status" class="status" style="display: none;">
+                Ready to chat!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+
+        async function sendQuery() {
+            const input = document.getElementById('user-input');
+            const query = input.value.trim();
+
+            if (!query) return;
+
+            // Show loading state
+            showStatus('Thinking...', true);
+            input.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                const data = await response.json();
+
+                // Update outputs
+                document.getElementById('response-output').textContent = data.response || 'No response generated';
+
+                // For now, show memory chunks as "thoughts" - this will be enhanced in later sprints
+                const thoughtText = data.memory_chunks && data.memory_chunks.length > 0
+                    ? `Retrieved ${data.memory_chunks.length} memory chunk(s):\n\n` +
+                      data.memory_chunks.map(chunk =>
+                          `• ${chunk.content.substring(0, 100)}... (score: ${chunk.score.toFixed(3)})`
+                      ).join('\n')
+                    : 'No relevant memories found.';
+
+                document.getElementById('thought-output').textContent = thoughtText;
+
+                // Show memory stats
+                if (data.memory_stats) {
+                    showMemoryStats(data.memory_stats);
+                }
+
+                // Clear input
+                input.value = '';
+
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('Error: Could not connect to Brein AI server', false);
+            } finally {
+                input.disabled = false;
+                setTimeout(() => hideStatus(), 3000);
+            }
+        }
+
+        function showStatus(message, isLoading = false) {
+            const status = document.getElementById('status');
+            status.textContent = isLoading ? message + ' ' : message;
+            if (isLoading) {
+                status.innerHTML += '<span class="loading"></span>';
+            }
+            status.style.display = 'block';
+        }
+
+        function hideStatus() {
+            document.getElementById('status').style.display = 'none';
+        }
+
+        function showMemoryStats(stats) {
+            const statsDiv = document.createElement('div');
+            statsDiv.className = 'memory-stats';
+            statsDiv.innerHTML = `
+                <strong>Memory Stats:</strong>
+                ${stats.total_nodes} nodes,
+                ${stats.vector_dimension}D embeddings,
+                Model: ${stats.embedding_model}
+            `;
+
+            const container = document.querySelector('.input-section');
+            const existing = container.querySelector('.memory-stats');
+            if (existing) existing.remove();
+            container.appendChild(statsDiv);
+        }
+
+        function clearChat() {
+            document.getElementById('response-output').textContent = 'Chat cleared. Ready for new conversation!';
+            document.getElementById('thought-output').textContent = 'Internal reasoning will appear here...';
+            document.getElementById('user-input').value = '';
+            const stats = document.querySelector('.memory-stats');
+            if (stats) stats.remove();
+        }
+
+        // Allow Enter key to send
+        document.getElementById('user-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendQuery();
+            }
+        });
+
+        // Check server health on load
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                if (response.ok) {
+                    showStatus('Connected to Brein AI server', false);
+                    setTimeout(() => hideStatus(), 2000);
+                }
+            } catch (error) {
+                showStatus('Warning: Could not connect to Brein AI server', false);
+            }
+        });
+    </script>
+</body>
+</html>

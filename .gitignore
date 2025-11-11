@@ -1,0 +1,77 @@
+# Virtual environments
+brein_env/
+venv/
+env/
+ENV/
+
+# Models and large files
+models/
+*.gguf
+*.bin
+*.pkl
+*.h5
+*.pb
+*.onnx
+*.tflite
+
+# Memory and data files
+memory/
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and temporary files
+*.log
+logs/
+temp/
+tmp/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Node modules (if any frontend JS dependencies)
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.production
