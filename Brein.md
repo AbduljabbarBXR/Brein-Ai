@@ -823,3 +823,64 @@ Add async learning pipeline to run in background.
 Build safe internet fetcher for missing info.
 
 Expand router logic for multi-agent mini-model brain.
+
+MODELS AND USE
+
+1. Phi-3.1 Mini Instruct 128k
+
+Role: Cortex (Personality + Reasoning + Identity + Conversation)
+This is the main “you’re talking to me” brain.
+It forms sentences, makes decisions, expresses emotion, recalls memory, and evolves your Brein’s “self.”
+
+Think of it as:
+
+The voice, the vibe, the awareness.
+
+2. TinyLlama 1.1B Chat
+
+Role: Broca/Wernicke Region (Speech + Style + Tone Shaping)
+This is not thinking — it is expressing.
+It refines phrasing, keeps conversations consistent, and adds your chosen “wife” tone.
+
+It makes responses:
+
+smooth
+
+natural
+
+emotionally correct
+
+Without burning computation.
+
+3. LLaMA 3.2 1B Instruct
+
+Role: Prefrontal Executive Supervisor
+This one watches Phi-3’s reasoning.
+It checks:
+
+logic errors
+
+hallucinations
+
+contradictions
+
+dangerous conclusions
+
+It does not speak unless needed.
+It’s the angel on the shoulder.
+
+So the Brain Hierarchy Looks Like This:
+User Input
+   ↓
+Executive Supervisor (LLaMA 3.2 1B) checks → “Is the question safe/logical?”
+   ↓ Yes
+Phi-3.1 (Main Brain) generates core meaning + reasoning
+   ↓
+TinyLlama refines tone + personality style
+   ↓
+Final Output to user
+
+
+If the Supervisor detects danger:
+
+Supervisor blocks / redirects / asks user clarifying questions.

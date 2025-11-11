@@ -245,15 +245,16 @@
                 // Update outputs
                 document.getElementById('response-output').textContent = data.response || 'No response generated';
 
-                // For now, show memory chunks as "thoughts" - this will be enhanced in later sprints
-                const thoughtText = data.memory_chunks && data.memory_chunks.length > 0
-                    ? `Retrieved ${data.memory_chunks.length} memory chunk(s):\n\n` +
-                      data.memory_chunks.map(chunk =>
-                          `• ${chunk.content.substring(0, 100)}... (score: ${chunk.score.toFixed(3)})`
-                      ).join('\n')
-                    : 'No relevant memories found.';
-
+                // Show thought trace in Box #2
+                const thoughtText = data.thought_trace || 'No internal reasoning available.';
                 document.getElementById('thought-output').textContent = thoughtText;
+
+                // Show confidence and metadata if available
+                if (data.confidence !== undefined) {
+                    const confidencePercent = (data.confidence * 100).toFixed(1);
+                    document.getElementById('thought-output').textContent +=
+                        `\n\nConfidence: ${confidencePercent}% | Activated nodes: ${data.reasoning_metadata?.activated_nodes || 0}`;
+                }
 
                 // Show memory stats
                 if (data.memory_stats) {

@@ -7,6 +7,10 @@ from typing import List, Dict, Tuple, Optional
 import pickle
 import json
 from datetime import datetime
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from neural_mesh import NeuralMesh
 
 class MemoryManager:
     """
@@ -39,6 +43,9 @@ class MemoryManager:
         self.index = faiss.IndexFlatIP(self.embedding_dim)  # Inner product (cosine similarity)
         self.id_to_idx = {}  # Maps node_id to FAISS index
         self.idx_to_id = {}  # Maps FAISS index to node_id
+
+        # Initialize Neural Mesh
+        self.neural_mesh = NeuralMesh()
 
         # Load existing data if available
         self._load_existing_data()
@@ -133,6 +140,9 @@ class MemoryManager:
         self.id_to_idx[node_id] = idx
         self.idx_to_id[idx] = node_id
 
+        # Add to neural mesh
+        self.neural_mesh.add_node(node_id, "memory", metadata)
+
         # Store in database
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -153,13 +163,14 @@ class MemoryManager:
 
         return node_id
 
-    def search_memory(self, query: str, top_k: int = 5) -> List[Dict]:
+    def search_memory(self, query: str, top_k: int = 5, use_mesh_expansion: bool = True) -> List[Dict]:
         """
-        Search memory for similar content.
+        Search memory for similar content, with optional neural mesh expansion.
 
         Args:
             query: Search query
             top_k: Number of top results to return
+            use_mesh_expansion: Whether to expand results using neural mesh
 
         Returns:
             List of dictionaries with node_id, content, score, and metadata
@@ -177,6 +188,8 @@ class MemoryManager:
         results = []
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+
+        activated_nodes = set()
 
         for score, idx in zip(scores[0], indices[0]):
             if idx != -1:  # Valid result
@@ -196,8 +209,69 @@ class MemoryManager:
                             "metadata": metadata
                         })
 
+                        activated_nodes.add(node_id)
+
+                        # Activate node in neural mesh
+                        self.neural_mesh.activate_node(node_id)
+
+        # Apply Hebbian reinforcement for co-activated nodes
+        if len(activated_nodes) > 1 and use_mesh_expansion:
+            node_list = list(activated_nodes)
+            for i in range(len(node_list)):
+                for j in range(i+1, len(node_list)):
+                    self.neural_mesh.reinforce_connection(node_list[i], node_list[j], 0.05)
+
+        # Expand results using neural mesh if requested
+        if use_mesh_expansion and results:
+            expanded_results = self._expand_with_mesh(results, top_k)
+            results = expanded_results
+
         conn.close()
         return results
+
+    def _expand_with_mesh(self, initial_results: List[Dict], max_total: int) -> List[Dict]:
+        """
+        Expand search results using neural mesh connections.
+
+        Args:
+            initial_results: Initial search results
+            max_total: Maximum total results to return
+
+        Returns:
+            Expanded results list
+        """
+        expanded_results = initial_results.copy()
+        seen_nodes = set(result["node_id"] for result in initial_results)
+
+        # For each initial result, get mesh neighbors
+        for result in initial_results:
+            node_id = result["node_id"]
+            neighbors = self.neural_mesh.get_neighbors(node_id, top_k=2)
+
+            for neighbor_id, weight in neighbors:
+                if neighbor_id not in seen_nodes and len(expanded_results) < max_total:
+                    # Get neighbor details from database
+                    conn = sqlite3.connect(self.db_path)
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT content, type, metadata FROM nodes WHERE node_id = ?", (neighbor_id,))
+                    row = cursor.fetchone()
+                    conn.close()
+
+                    if row:
+                        content, memory_type, metadata_str = row
+                        metadata = json.loads(metadata_str) if metadata_str else {}
+
+                        expanded_results.append({
+                            "node_id": neighbor_id,
+                            "content": content,
+                            "type": memory_type,
+                            "score": float(weight * 0.8),  # Reduce score for mesh-expanded results
+                            "metadata": {**metadata, "expanded_via_mesh": True}
+                        })
+
+                        seen_nodes.add(neighbor_id)
+
+        return expanded_results
 
     def get_memory_stats(self) -> Dict:
         """Get statistics about the memory system."""
@@ -212,12 +286,15 @@ class MemoryManager:
 
         conn.close()
 
+        mesh_stats = self.neural_mesh.get_mesh_stats()
+
         return {
             "total_nodes": total_nodes,
             "vector_dimension": self.embedding_dim,
             "index_size": self.index.ntotal,
             "type_distribution": type_counts,
-            "embedding_model": self.embedding_model_name
+            "embedding_model": self.embedding_model_name,
+            "neural_mesh": mesh_stats
         }
 
     def chunk_text(self, text: str, chunk_size: int = 512, overlap: int = 50) -> List[str]:

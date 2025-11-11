@@ -5,6 +5,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from memory_manager import MemoryManager
+from memory_transformer import MemoryTransformer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,25 +17,28 @@ class Orchestrator:
 
     def __init__(self, memory_manager: MemoryManager):
         self.memory = memory_manager
+        self.memory_transformer = MemoryTransformer()
         self.session_context = {}  # Simple session storage
 
     async def process_query(self, query: str, session_id: Optional[str] = None) -> Dict:
         """
-        Process a user query and return response with memory context.
+        Process a user query and return response with memory context and thought trace.
 
         Args:
             query: User query string
             session_id: Optional session identifier
 
         Returns:
-            Dictionary with response, memory_chunks, and metadata
+            Dictionary with response, thought_trace, memory_chunks, and metadata
         """
         try:
             # Search memory for relevant context
-            memory_results = self.memory.search_memory(query, top_k=5)
+            memory_results = self.memory.search_memory(query, top_k=5, use_mesh_expansion=True)
 
-            # Extract memory chunks for context
+            # Extract memory chunks and embeddings for thought generation
             memory_chunks = []
+            memory_embeddings = []
+
             for result in memory_results:
                 memory_chunks.append({
                     "content": result["content"],
@@ -42,9 +46,25 @@ class Orchestrator:
                     "type": result["type"]
                 })
 
-            # For now, return a simple canned response with memory context
-            # This will be enhanced with actual model inference in later sprints
-            response = self._generate_canned_response(query, memory_chunks)
+                # Get embedding from database for thought generation
+                conn = self.memory.conn if hasattr(self.memory, 'conn') else None
+                if conn is None:
+                    import sqlite3
+                    conn = sqlite3.connect(self.memory.db_path)
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT embedding FROM nodes WHERE node_id = ?", (result["node_id"],))
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        import pickle
+                        embedding = pickle.loads(row[0])
+                        memory_embeddings.append(embedding)
+                    conn.close()
+
+            # Generate thought trace using memory transformer
+            thought_result = self.memory_transformer.generate_thought_trace(memory_embeddings, query)
+
+            # Generate response based on memory context
+            response = self._generate_response_with_memory(query, memory_chunks, thought_result)
 
             # Store conversation in memory
             if session_id:
@@ -52,28 +72,42 @@ class Orchestrator:
 
             return {
                 "response": response,
+                "thought_trace": thought_result["thought_trace"],
+                "confidence": thought_result["confidence"],
                 "memory_chunks": memory_chunks,
                 "session_id": session_id or "default",
-                "memory_stats": self.memory.get_memory_stats()
+                "memory_stats": self.memory.get_memory_stats(),
+                "reasoning_metadata": {
+                    "activated_nodes": thought_result["activated_nodes"],
+                    "reasoning_type": thought_result["reasoning_type"],
+                    "model_used": thought_result.get("model_used", "unknown")
+                }
             }
 
         except Exception as e:
             logger.error(f"Error processing query: {e}")
             raise HTTPException(status_code=500, detail=f"Query processing failed: {str(e)}")
 
-    def _generate_canned_response(self, query: str, memory_chunks: List[Dict]) -> str:
+    def _generate_response_with_memory(self, query: str, memory_chunks: List[Dict], thought_result: Dict) -> str:
         """
-        Generate a simple canned response based on query and memory context.
-        This is a placeholder that will be replaced by actual model inference.
+        Generate a response using memory context and thought trace.
         """
         if not memory_chunks:
             return f"I understand you're asking about '{query}'. I don't have specific memories about this yet, but I'm learning!"
 
-        # Simple response generation based on top memory chunk
-        top_chunk = memory_chunks[0]
-        confidence = "confident" if top_chunk["score"] > 0.7 else "somewhat uncertain"
+        # Use thought trace confidence to modulate response
+        confidence = thought_result.get("confidence", 0.5)
+        confidence_text = "very confident" if confidence > 0.8 else "confident" if confidence > 0.6 else "somewhat uncertain"
 
-        return f"Based on what I know, and feeling {confidence} about this: {top_chunk['content'][:200]}..."
+        # Generate response based on top memory chunk
+        top_chunk = memory_chunks[0]
+
+        # Include thought insights in response
+        thought_insight = ""
+        if thought_result["reasoning_type"] != "empty_memory":
+            thought_insight = f" My internal reasoning suggests this connects to {thought_result['activated_nodes']} related concepts."
+
+        return f"Based on my memory and feeling {confidence_text} about this: {top_chunk['content'][:200]}...{thought_insight}"
 
     def _store_conversation(self, session_id: str, query: str, response: str, memory_results: List[Dict]):
         """
