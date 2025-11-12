@@ -5,6 +5,7 @@ Tests PromptManager functionality and prompt loading/integration.
 
 import sys
 import os
+import asyncio
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from prompt_manager import PromptManager
@@ -14,16 +15,17 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def test_prompt_manager_initialization():
+async def test_prompt_manager_initialization():
     """Test that PromptManager initializes correctly"""
     print("Testing PromptManager initialization...")
 
     # Initialize SAL
     sal = SystemAwarenessLayer()
-    sal.initialize()
+    await sal.initialize()
 
     # Initialize PromptManager
     prompt_manager = PromptManager(prompts_dir="backend/prompts", sal=sal)
+    await prompt_manager.set_sal(sal)
 
     # Check that prompts were loaded
     available_prompts = prompt_manager.list_available_prompts()
@@ -35,6 +37,41 @@ def test_prompt_manager_initialization():
 
     print("✓ PromptManager initialization test passed")
     return prompt_manager
+
+async def run_all_tests_async():
+    """Run all prompt system tests asynchronously"""
+    print("🚀 Starting Brein AI Prompt System Tests")
+    print("=" * 50)
+
+    try:
+        # Test initialization
+        prompt_manager = await test_prompt_manager_initialization()
+
+        # Test prompt categories
+        test_identity_prompts(prompt_manager)
+        test_agent_prompts(prompt_manager)
+        test_system_prompts(prompt_manager)
+
+        # Test functionality
+        test_prompt_substitution(prompt_manager)
+        test_no_model_disclosure(prompt_manager)
+
+        print("\n" + "=" * 50)
+        print("🎉 All prompt system tests passed!")
+        print("✓ PromptManager working correctly")
+        print("✓ All prompts loaded and accessible")
+        print("✓ Identity and awareness properly defined")
+        print("✓ No model implementation details leaked")
+        print("✓ Variable substitution working")
+        print("✓ SAL integration ready")
+
+        return True
+
+    except Exception as e:
+        print(f"\n❌ Test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 def test_identity_prompts(prompt_manager):
     """Test identity and self-awareness prompts"""
@@ -142,41 +179,6 @@ def test_no_model_disclosure(prompt_manager):
 
     print("✓ Model disclosure prevention test passed")
 
-def run_all_tests():
-    """Run all prompt system tests"""
-    print("🚀 Starting Brein AI Prompt System Tests")
-    print("=" * 50)
-
-    try:
-        # Test initialization
-        prompt_manager = test_prompt_manager_initialization()
-
-        # Test prompt categories
-        test_identity_prompts(prompt_manager)
-        test_agent_prompts(prompt_manager)
-        test_system_prompts(prompt_manager)
-
-        # Test functionality
-        test_prompt_substitution(prompt_manager)
-        test_no_model_disclosure(prompt_manager)
-
-        print("\n" + "=" * 50)
-        print("🎉 All prompt system tests passed!")
-        print("✓ PromptManager working correctly")
-        print("✓ All prompts loaded and accessible")
-        print("✓ Identity and awareness properly defined")
-        print("✓ No model implementation details leaked")
-        print("✓ Variable substitution working")
-        print("✓ SAL integration ready")
-
-        return True
-
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
 if __name__ == "__main__":
-    success = run_all_tests()
+    success = asyncio.run(run_all_tests_async())
     sys.exit(0 if success else 1)

@@ -38,6 +38,14 @@ class SystemAwarenessLayer:
             'thalamus_router'
         ]
 
+        # Setup error recovery patterns synchronously
+        self._setup_error_recovery_patterns_sync()
+
+    def _setup_error_recovery_patterns_sync(self):
+        """Set up error recovery patterns synchronously for __init__"""
+        # This is a placeholder - the actual async setup happens in initialize()
+        pass
+
     async def initialize(self) -> bool:
         """
         Initialize SAL and establish brain communication channels
@@ -775,7 +783,12 @@ class CoordinationEngine:
         }
 
         # Initialize error recovery patterns
-        self._setup_error_recovery_patterns()
+        self._setup_error_recovery_patterns_sync()
+
+    def _setup_error_recovery_patterns_sync(self):
+        """Set up error recovery patterns synchronously for __init__"""
+        # This is a placeholder - the actual async setup happens in initialize()
+        pass
 
     async def initialize(self):
         """Initialize coordination engine with recovery patterns"""

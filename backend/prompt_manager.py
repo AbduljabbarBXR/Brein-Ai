@@ -29,9 +29,13 @@ class PromptManager:
         # Load all prompts on initialization
         self._load_all_prompts()
 
-        # Connect to SAL if available
+        # SAL connection will be established later via set_sal()
+
+    async def set_sal(self, sal):
+        """Set SAL reference and establish connection"""
+        self.sal = sal
         if self.sal:
-            self._connect_to_sal()
+            await self._connect_to_sal()
 
     async def _connect_to_sal(self):
         """Connect to System Awareness Layer for prompt optimization"""

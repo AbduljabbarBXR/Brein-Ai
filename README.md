@@ -7,6 +7,23 @@
 
 Brein AI is a revolutionary memory-first artificial intelligence system inspired by the human brain's architecture. It combines advanced vector databases, neural mesh learning, multi-agent processing, and comprehensive safety measures to create a powerful yet safe AI assistant.
 
+## 📖 Table of Contents
+
+- [🧠 Core Features](#-core-features)
+- [🚀 Quick Start](#-quick-start)
+- [💻 Usage](#-usage)
+- [📚 API Documentation](#-api-documentation)
+- [🏗️ System Architecture](#️-system-architecture)
+- [🔧 Configuration](#-configuration)
+- [🧪 Testing](#-testing)
+- [📊 Performance Metrics](#-performance-metrics)
+- [🔒 Security Features](#-security-features)
+- [📱 Mobile Deployment](#-mobile-deployment)
+- [🤝 Contributing](#-contributing)
+- [📝 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+- [📞 Support](#-support)
+
 ## 🧠 Core Features
 
 ### Memory-First Architecture
@@ -17,8 +34,9 @@ Brein AI is a revolutionary memory-first artificial intelligence system inspired
 
 ### Multi-Agent Brain Architecture
 - **Hippocampus Agent**: Memory encoding and ingestion
-- **Cortex Agent**: Reasoning and thought generation
-- **Basal Ganglia Agent**: Policy decisions and reinforcement learning
+- **Prefrontal Cortex Agent**: Complex reasoning and planning
+- **Amygdala Agent**: Emotional intelligence and personality
+- **Thalamus Router**: Intelligent query routing and model selection
 
 ### Safety & Security
 - **Web Content Pipeline**: Fetch → Sanitize → Vet → Quarantine → Review → Ingest
@@ -38,63 +56,84 @@ Brein AI is a revolutionary memory-first artificial intelligence system inspired
 
 ## 🚀 Quick Start
 
+### Prerequisites
+- Python 3.8+
+- Git
+
 ### Installation
 
 #### Option 1: Automated Installer (Recommended)
-~bash
+```bash
 # Clone the repository
 git clone https://github.com/AbduljabbarBXR/Brein-Ai.git
 cd Brein-Ai
 
 # Run the installer
 python setup.py
-~
+```
 
 #### Option 2: Manual Installation
-~bash
-# Clone and setup
+```bash
+# Clone the repository and navigate into it
 git clone https://github.com/AbduljabbarBXR/Brein-Ai.git
 cd Brein-Ai
 
-# Create virtual environment
+# Create and activate a virtual environment
 python -m venv brein_env
-source brein_env/bin/activate  # On Windows: brein_env\Scripts\activate
+source brein_env/bin/activate  # On Windows use: brein_env\Scripts\activate
 
-# Install dependencies
+# Install the required dependencies
 pip install -r requirements.txt
 
 # Start the system
 python backend/main.py
-~
+```
 
-### Basic Usage
+## 💻 Usage
 
-1. **Start the Server**:
-   ~bash
-   python backend/main.py
-   ~
-   The API will be available at `http://localhost:8000`
+### Starting the Server
+To start the Brein AI server, run the following command in the project's root directory:
 
-2. **Access the Web Interface**:
-   Open `frontend/index.html` in your browser
+```bash
+python backend/main.py
+```
 
-3. **Make API Calls**:
-   ~python
-   import requests
+The API will be available at `http://localhost:8000`.
 
-   # Query the system
-   response = requests.post("http://localhost:8000/api/query",
-       json={"query": "Explain machine learning", "session_id": "user123"})
+### Accessing the Web Interface
+Once the server is running, you can access the web interface by opening the `frontend/index.html` file in your web browser.
 
-   print(response.json())
-   ~
+### Making API Calls
+You can interact with the Brein AI API using any HTTP client. Here is a Python example:
+
+```python
+import requests
+
+# Define the API endpoint
+url = "http://localhost:8000/api/query"
+
+# Define the payload
+payload = {
+    "query": "Explain machine learning in simple terms.",
+    "session_id": "user123"
+}
+
+# Send the POST request
+response = requests.post(url, json=payload)
+
+# Print the response
+print(response.json())
+```
 
 ## 📚 API Documentation
+
+<details>
+<summary><strong>Click to expand API Endpoints</strong></summary>
 
 ### Core Endpoints
 
 #### Query Processing
-~http
+```http
 POST /api/query
 Content-Type: application/json
 
@@ -103,78 +142,169 @@ Content-Type: application/json
   "session_id": "optional_session_id",
   "enable_web_access": false
 }
-~
+```
 
 #### Memory Management
-~http
+```http
 GET /api/memory/stats          # Get memory statistics
 GET /api/memory/search?q=term  # Search memory
 POST /api/ingest              # Ingest new content
-~
+```
 
 #### Web Content Integration
-~http
+```http
 POST /api/web/fetch           # Fetch web content (with safety pipeline)
 GET /api/web/quarantine/list  # List quarantined content
 POST /api/web/review          # Approve/reject quarantined content
-~
+```
 
 #### Device Synchronization
-~http
+```http
 POST /api/sync/register-device  # Register mobile device
 POST /api/sync/delta           # Get sync delta
 POST /api/sync/apply-delta     # Apply sync changes
-~
+```
 
 #### Testing & Monitoring
-~http
+```http
 POST /api/test/run-comprehensive  # Run full test suite
 POST /api/profiler/start         # Start performance monitoring
 GET /api/profiler/health         # Get system health status
-~
+```
+
+</details>
 
 ## 🏗️ System Architecture
 
-~
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web Interface │    │     REST API    │    │   Mobile Apps   │
-│    (HTML/JS)    │    │    (FastAPI)    │    │   (React Native)│
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-          │                       │                       │
-          └───────────────────────┼───────────────────────┘
-                                  │
-                    ┌─────────────────────┐
-                    │    Orchestrator     │
-                    │  (Multi-Agent)      │
-                    └─────────────────────┘
-                          │       │
-              ┌───────────┼───────┴────────────┐
-              │           │                    │
-    ┌─────────▼────┐  ┌───▼────┐  ┌───────────▼─────────┐
-    │ Hippocampus  │  │ Cortex │  │   Basal Ganglia     │
-    │   (Memory)   │  │(Reason)│  │   (Policy/Reinforce)│
-    └──────────────┘  └────────┘  └─────────────────────┘
-              │           │                    │
-              └───────────┼────────────────────┘
-                          │
-            ┌─────────────▼─────────────────────┐
-            │         Memory Manager            │
-            │   ┌─────────────┬─────────────┐   │
-            │   │   FAISS     │  SQLite     │   │
-            │   │  (Vectors)  │ (Metadata)  │   │
-            │   └─────────────┴─────────────┘   │
-            │   ┌─────────────────────────────┐ │
-            │   │       Neural Mesh           │ │
-            │   │   (Associative Learning)    │ │
-            │   └─────────────────────────────┘ │
-            └───────────────────────────────────┘
-~
+<details>
+<summary><strong>Click to expand System Architecture Diagrams</strong></summary>
+
+### Frontend Interfaces
+
+<div align="center">
+  <img src="docs/images/Frontend.png" alt="Brein AI Frontend Interface" width="600"/>
+  <p><em>Figure 1: Brein AI Frontend Interface - Main user interaction dashboard</em></p>
+</div>
+
+<div align="center">
+  <img src="docs/images/Knowledge base frontend.png" alt="Knowledge Base Frontend" width="600"/>
+  <p><em>Figure 2: Knowledge Base Interface - Memory and content management</em></p>
+</div>
+
+<div align="center">
+  <img src="docs/images/Neural mesh visualizer Frontend.png" alt="Neural Mesh Visualizer" width="600"/>
+  <p><em>Figure 3: Neural Mesh Visualization - Interactive associative memory network</em></p>
+</div>
+
+<div align="center">
+  <img src="docs/images/System analytics frontend.png" alt="System Analytics Frontend" width="600"/>
+  <p><em>Figure 4: System Analytics Dashboard - Performance monitoring and health metrics</em></p>
+</div>
+
+### Core System Architecture (Text Diagram)
+
+```
+┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
+│    Web Interface    │    │      REST API       │    │    Mobile Apps      │
+│     (HTML/JS)       │    │     (FastAPI)       │    │   (React Native)    │
+└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
+           │                           │                           │
+           └───────────────────────────┼───────────────────────────┘
+                                       │
+                    ┌─────────────────────────────────┐
+                    │         Orchestrator            │
+                    │       (Multi-Agent)            │
+                    └─────────────────────────────────┘
+                               │           │
+               ┌───────────────┼───────────┴───────────────┐
+               │               │                           │
+    ┌──────────▼────────┐  ┌───▼────────┐  ┌──────────────▼──────────────┐
+    │   Hippocampus     │  │ Prefrontal  │  │        Thalamus            │
+    │    (Memory)       │  │   Cortex    │  │        Router              │
+    │                   │  │  (Reason)   │  │      (Routing)             │
+    └───────────────────┘  └─────────────┘  └─────────────────────────────┘
+               │               │                           │
+               └───────────────┼───────────────────────────┘
+                               │
+            ┌─────────────────────────────────────────────────┐
+            │              Memory Manager                     │
+            │   ┌─────────────────┬─────────────────┐        │
+            │   │     FAISS       │     SQLite      │        │
+            │   │   (Vectors)     │   (Metadata)    │        │
+            │   └─────────────────┴─────────────────┘        │
+            │   ┌───────────────────────────────────────┐    │
+            │   │          Neural Mesh                  │    │
+            │   │      (Associative Learning)           │    │
+            │   └───────────────────────────────────────┘    │
+            └─────────────────────────────────────────────────┘
+```
+
+### Brain-Inspired Multi-Agent Architecture (Text Diagram)
+
+```
+                              ┌─────────────────────────────────┐
+                              │    SYSTEM AWARENESS LAYER      │
+                              │         (SAL Core)             │
+                              │                                 │
+                              │  ┌─────────────┐ ┌─────────────┐ │
+                              │  │ Event Bus   │ │Message Router│ │
+                              │  └─────────────┘ └─────────────┘ │
+                              │                                 │
+                              │  ┌─────────────┐ ┌─────────────┐ │
+                              │  │Brain State  │ │Coordination │ │
+                              │  │Manager      │ │Engine       │ │
+                              │  └─────────────┘ └─────────────┘ │
+                              └─────────────────────────────────┘
+                                                │
+                              ┌─────────────────┼─────────────────┐
+                              │                 │                 │
+                   ┌──────────▼────────┐  ┌─────▼─────┐  ┌────────▼─────────┐
+                   │   Hippocampus     │  │  Amygdala  │  │    Thalamus      │
+                   │    (Memory)       │  │ (Emotion)  │  │    Router        │
+                   │                   │  │            │  │   (Routing)      │
+                   └───────────────────┘  └────────────┘  └──────────────────┘
+                              │                 │                 │
+                              └─────────────────┼─────────────────┘
+                                                │
+                              ┌─────────────────▼─────────────────┐
+                              │        Prefrontal Cortex          │
+                              │         (Reasoning)               │
+                              └───────────────────────────────────┘
+```
+
+### SAL Communication Flow (Text Diagram)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                 SYSTEM AWARENESS LAYER (SAL)                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐     │
+│  │  Async Event    │  │   Message       │  │   Brain State    │     │
+│  │     Bus         │  │   Router        │  │   Manager        │     │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘     │
+│            │                        │                        │     │
+│            └────────────────────────┼────────────────────────┘     │
+│                                     │                               │
+│                    ┌────────────────▼────────────────┐              │
+│                    │      Coordination Engine         │              │
+│                    └──────────────────────────────────┘              │
+└─────────────────────────────────────────────────────────────────────┘
+                                      │
+                    ┌─────────────────┼─────────────────┐
+                    │                 │                 │
+          ┌─────────▼────────┐  ┌─────▼─────┐  ┌────────▼─────────┐
+          │  Agent Events    │  │Coordination│  │   State Updates  │
+          │   & Messages     │  │  Messages  │  │   & Sync         │
+          └──────────────────┘  └────────────┘  └──────────────────┘
+```
+
+</details>
 
 ## 🔧 Configuration
 
-Create a `config.json` file in the installation directory:
+Create a `config.json` file in the installation directory with the following structure:
 
-~json
+```json
 {
   "database": {
     "path": "memory/brein_memory.db"
@@ -191,30 +321,34 @@ Create a `config.json` file in the installation directory:
     "audit_enabled": true
   }
 }
-~
+```
 
 ## 🧪 Testing
 
 ### Run Comprehensive Tests
-~bash
-# Run full test suite with 1000+ documents
+To run the full test suite with over 1000 documents, use the following cURL command:
+
+```bash
 curl -X POST http://localhost:8000/api/test/run-comprehensive
-~
+```
 
 ### Performance Benchmarking
-~bash
-# Run performance benchmark
-curl -X POST http://localhost:8000/api/test/benchmark -d '{"iterations": 100}'
-~
+To run a performance benchmark, use this command:
 
-### Start Performance Monitoring
-~bash
+```bash
+curl -X POST http://localhost:8000/api/test/benchmark -d '{"iterations": 100}'
+```
+
+### Performance Monitoring
+You can start real-time monitoring and fetch current metrics with these commands:
+
+```bash
 # Start real-time monitoring
 curl -X POST http://localhost:8000/api/profiler/start
 
 # Get current metrics
 curl http://localhost:8000/api/profiler/current
-~
+```
 
 ## 📊 Performance Metrics
 
@@ -235,15 +369,17 @@ curl http://localhost:8000/api/profiler/current
 ## 📱 Mobile Deployment
 
 ### Export Models for Mobile
-~bash
-# Export embedding model to TFLite
+To export the embedding model to TFLite, use the following command:
+
+```bash
 curl -X POST http://localhost:8000/api/models/export-mobile-bundle \
   -d '{"bundle_name": "brein_mobile_v1"}'
-~
+```
 
 ### Device Registration
-~bash
-# Register mobile device
+Register a new mobile device with this cURL command:
+
+```bash
 curl -X POST http://localhost:8000/api/sync/register-device \
   -d '{
     "device_id": "mobile_001",
@@ -251,19 +387,21 @@ curl -X POST http://localhost:8000/api/sync/register-device \
     "device_type": "mobile",
     "capabilities": ["offline_mode", "sync"]
   }'
-~
+```
 
 ## 🤝 Contributing
 
+Contributions are welcome! Please follow these steps:
+
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+2. Create a new feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the LICENSE file for more details.
 
 ## 🙏 Acknowledgments
 
@@ -276,8 +414,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - **Documentation**: [Brein AI Docs](https://github.com/AbduljabbarBXR/Brein-Ai)
-- **Discussions**: [Email](abdijabar2009@gmail.com)
+- **Discussions**: abdijabarboxer2009@gmail.com
 
 ---
 
-**Built with ❤️ for the future of AI**
+<div align="center">
+  <strong>Built with ❤️ for the future of AI</strong>
+</div>
