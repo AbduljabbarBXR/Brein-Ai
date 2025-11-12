@@ -12,6 +12,7 @@ Brein AI is a revolutionary memory-first artificial intelligence system inspired
 - [🧠 Core Features](#-core-features)
 - [🚀 Quick Start](#-quick-start)
 - [💻 Usage](#-usage)
+- [📚 Documentation](#-documentation)
 - [📚 API Documentation](#-api-documentation)
 - [🏗️ System Architecture](#️-system-architecture)
 - [🔧 Configuration](#-configuration)
@@ -124,6 +125,42 @@ response = requests.post(url, json=payload)
 # Print the response
 print(response.json())
 ```
+
+## 📚 Documentation
+
+Brein AI has comprehensive documentation available in our GitHub Wiki. All documentation is organized and cross-referenced for easy navigation.
+
+### 🚀 Getting Started
+- **[Quick Start Guide](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Quick-Start)** - 5-minute setup with first interactions
+- **[Installation Guide](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Installation-Guide)** - Complete setup for all platforms
+- **[User Manual](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/User-Manual)** - Complete guide for daily usage and features
+
+### 💻 User Interfaces
+- **[Web Interface Guide](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Web-Interface)** - Complete web interface with customization and monitoring
+- **[Mobile Apps Guide](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Mobile-Apps)** - iOS, Android, and PWA mobile applications
+
+### 🏗️ Technical Documentation
+- **[API Reference](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/API-Reference)** - Comprehensive API documentation with examples
+- **[Architecture Overview](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Architecture-Overview)** - Detailed system architecture and design
+- **[Memory System](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Memory-System)** - Vector databases and neural mesh details
+- **[Multi-Agent System](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Multi-Agent-Architecture)** - Agent coordination and SAL system
+- **[Security Overview](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Security-Overview)** - Safety measures and compliance framework
+
+### ⚙️ Configuration & Operations
+- **[Configuration Guide](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Configuration)** - Complete configuration options and settings
+- **[Troubleshooting Guide](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Troubleshooting)** - Common issues and solutions
+- **[Performance Optimization](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Performance-Optimization)** - Tuning and optimization strategies
+
+### 🛠️ Development & Deployment
+- **[Contributing Guide](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Contributing)** - Development guidelines and contribution process
+- **[Testing Guide](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Testing)** - Unit, integration, and performance testing
+- **[Deployment Guide](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Deployment)** - Production deployment for all platforms
+
+### 📖 Additional Resources
+- **[Home](https://github.com/AbduljabbarBXR/Brein-Ai/wiki/Home)** - Main navigation and overview
+- **GitHub Wiki**: [https://github.com/AbduljabbarBXR/Brein-Ai/wiki](https://github.com/AbduljabbarBXR/Brein-Ai/wiki)
+
+**📚 Total Documentation: 17 comprehensive wiki pages covering all aspects of Brein AI**
 
 ## 📚 API Documentation
 
