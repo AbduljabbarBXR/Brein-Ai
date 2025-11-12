@@ -77,6 +77,4 @@ node_modules/
 .env.production
 
 # Project documentation (keep local only)
-SPRINT.md
-Brein.md
-FINALISING.MD
+# Note: Only README.md is tracked in the repository
