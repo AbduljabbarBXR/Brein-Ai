@@ -176,9 +176,6 @@ GET /api/profiler/health         # Get system health status
 
 ## 🏗️ System Architecture
 
-<details>
-<summary><strong>Click to expand System Architecture Diagrams</strong></summary>
-
 ### Frontend Interfaces
 
 <div align="center">
@@ -200,6 +197,9 @@ GET /api/profiler/health         # Get system health status
   <img src="docs/images/System analytics frontend.png" alt="System Analytics Frontend" width="600"/>
   <p><em>Figure 4: System Analytics Dashboard - Performance monitoring and health metrics</em></p>
 </div>
+
+<details>
+<summary><strong>Click to expand detailed System Architecture Diagrams</strong></summary>
 
 ### Core System Architecture (Text Diagram)
 
