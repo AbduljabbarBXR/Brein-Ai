@@ -1581,10 +1581,16 @@
 
         async function loadNeuralNetworkData() {
             try {
-                const memoryResponse = await fetch(`${API_BASE}/api/memory/stats`);
-                const memoryData = memoryResponse.ok ? await memoryResponse.json() : null;
+                // Fetch both memory stats and full neural mesh data
+                const [memoryResponse, meshResponse] = await Promise.all([
+                    fetch(`${API_BASE}/api/memory/stats`),
+                    fetch(`${API_BASE}/api/neural-mesh/full`)
+                ]);
 
-                displayNeuralNetworkData(memoryData);
+                const memoryData = memoryResponse.ok ? await memoryResponse.json() : null;
+                const meshData = meshResponse.ok ? await meshResponse.json() : null;
+
+                displayNeuralNetworkData(memoryData, meshData);
             } catch (error) {
                 console.error('Error loading neural network data:', error);
                 document.getElementById('neural-network-content').innerHTML =
@@ -1592,7 +1598,7 @@
             }
         }
 
-        function displayNeuralNetworkData(memoryData) {
+        function displayNeuralNetworkData(memoryData, meshData) {
             // AI Architecture
             const architectureContainer = document.getElementById('ai-architecture');
             if (memoryData) {
@@ -1645,7 +1651,7 @@
 
             // Neural Mesh Status
             const meshContainer = document.getElementById('neural-mesh-status');
-            if (memoryData && memoryData.neural_mesh) {
+            if (memoryData && memoryData.neural_mesh && meshData && meshData.nodes) {
                 const mesh = memoryData.neural_mesh;
                 meshContainer.innerHTML = `
                     <div style="background: #404040; border-radius: 8px; padding: 20px; border: 1px solid #4e4e50;">
@@ -1675,9 +1681,9 @@
                     </div>
                 `;
 
-                // Initialize neural network visualization
+                // Initialize neural network visualization with FULL mesh data
                 setTimeout(() => {
-                    initializeNeuralNetworkGraph(mesh);
+                    initializeNeuralNetworkGraph(meshData);
                 }, 100);
             } else {
                 meshContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #9ca3af; background: #404040; border-radius: 8px; border: 1px solid #4e4e50;">Neural mesh information not available</div>';
@@ -1948,56 +1954,117 @@
         });
 
         // Neural network visualization function
-        function initializeNeuralNetworkGraph(mesh) {
+        function initializeNeuralNetworkGraph(meshData) {
             const container = document.getElementById('neural-network-graph');
             if (!container) return;
 
-            // Create sample nodes and edges for visualization
             const nodes = [];
             const edges = [];
 
-            // Create nodes based on mesh data
-            const nodeCount = Math.min(mesh.active_nodes || 10, 20); // Limit to 20 nodes for visualization
+            // Helper function to get node color based on type
+            function getNodeColor(nodeType) {
+                const colors = {
+                    'memory': '#10a37f',    // Green for memory nodes
+                    'concept': '#3b82f6',   // Blue for concepts
+                    'working': '#f59e0b',   // Orange for working memory
+                    'long_term': '#8b5cf6', // Purple for long-term memory
+                    'default': '#6b7280'    // Gray for unknown
+                };
+                return colors[nodeType] || colors.default;
+            }
 
-            for (let i = 0; i < nodeCount; i++) {
-                nodes.push({
-                    id: i,
-                    label: `Node ${i + 1}`,
-                    shape: 'circle',
-                    size: 20 + Math.random() * 10,
-                    color: {
-                        background: '#10a37f',
-                        border: '#0d9488'
-                    },
-                    font: {
-                        color: '#fff',
-                        size: 12
+            // Helper function to get edge color based on weight
+            function getEdgeColor(weight) {
+                if (weight >= 0.7) return '#10a37f';      // Strong green
+                if (weight >= 0.5) return '#f59e0b';      // Medium orange
+                if (weight >= 0.3) return '#f97316';      // Light orange
+                return '#6b7280';                         // Weak gray
+            }
+
+            // Process real nodes from mesh data
+            if (meshData && meshData.nodes) {
+                Object.entries(meshData.nodes).forEach(([nodeId, nodeData]) => {
+                    const activation = nodeData.activation_level || 0;
+                    const nodeType = nodeData.type || 'unknown';
+                    const activationCount = nodeData.activation_count || 0;
+
+                    // Create meaningful label
+                    const label = `${nodeType} (${activationCount})`;
+
+                    // Size based on activation level (20-40 pixels)
+                    const size = 20 + (activation * 20);
+
+                    // Color based on node type
+                    const color = getNodeColor(nodeType);
+
+                    nodes.push({
+                        id: nodeId,
+                        label: label,
+                        shape: 'circle',
+                        size: size,
+                        color: {
+                            background: color,
+                            border: '#ffffff',
+                            highlight: {
+                                background: color,
+                                border: '#ffffff'
+                            }
+                        },
+                        font: {
+                            color: '#ffffff',
+                            size: 10,
+                            face: 'arial'
+                        },
+                        title: `ID: ${nodeId}<br>Type: ${nodeType}<br>Activation: ${activation.toFixed(2)}<br>Count: ${activationCount}<br>Last: ${new Date(nodeData.last_activated).toLocaleString()}`
+                    });
+                });
+            }
+
+            // Process real edges from mesh data
+            if (meshData && meshData.edges) {
+                Object.entries(meshData.edges).forEach(([edgeKey, edgeData]) => {
+                    const [fromNode, toNode] = edgeKey.split('::');
+                    const weight = edgeData.weight || 0.1;
+                    const reinforcementCount = edgeData.reinforcement_count || 0;
+
+                    // Only add edge if both nodes exist in our visualization
+                    if (nodes.find(n => n.id === fromNode) && nodes.find(n => n.id === toNode)) {
+                        edges.push({
+                            from: fromNode,
+                            to: toNode,
+                            width: Math.max(1, Math.min(5, weight * 3)), // Width 1-5 based on weight
+                            color: {
+                                color: getEdgeColor(weight),
+                                highlight: '#10a37f',
+                                opacity: 0.8
+                            },
+                            title: `Weight: ${weight.toFixed(3)}<br>Reinforcements: ${reinforcementCount}<br>Type: ${edgeData.edge_type || 'unknown'}`,
+                            arrows: {
+                                to: { enabled: false },
+                                from: { enabled: false }
+                            },
+                            smooth: {
+                                enabled: true,
+                                type: 'continuous'
+                            }
+                        });
                     }
                 });
             }
 
-            // Create edges based on connections
-            const edgeCount = Math.min(mesh.total_connections || 15, 30); // Limit edges for performance
-            for (let i = 0; i < edgeCount; i++) {
-                const from = Math.floor(Math.random() * nodeCount);
-                let to = Math.floor(Math.random() * nodeCount);
-                while (to === from) {
-                    to = Math.floor(Math.random() * nodeCount);
-                }
-
-                edges.push({
-                    from: from,
-                    to: to,
-                    color: {
-                        color: '#4e4e50',
-                        highlight: '#10a37f'
-                    },
-                    width: 1 + Math.random() * 2,
-                    arrows: {
-                        to: { enabled: false },
-                        from: { enabled: false }
-                    }
+            // Limit nodes for performance (show top 30 most active)
+            if (nodes.length > 30) {
+                nodes.sort((a, b) => {
+                    const aActivation = parseFloat(a.title.match(/Activation: ([\d.]+)/)?.[1] || 0);
+                    const bActivation = parseFloat(b.title.match(/Activation: ([\d.]+)/)?.[1] || 0);
+                    return bActivation - aActivation;
                 });
+                nodes.splice(30); // Keep only top 30
+
+                // Filter edges to only include connections between remaining nodes
+                const nodeIds = new Set(nodes.map(n => n.id));
+                const filteredEdges = edges.filter(e => nodeIds.has(e.from) && nodeIds.has(e.to));
+                edges.splice(0, edges.length, ...filteredEdges);
             }
 
             const data = {
@@ -2008,46 +2075,65 @@
             const options = {
                 nodes: {
                     borderWidth: 2,
-                    borderWidthSelected: 3
+                    borderWidthSelected: 3,
+                    shadow: true
                 },
                 edges: {
+                    shadow: true,
                     smooth: {
                         enabled: true,
-                        type: 'continuous'
+                        type: 'continuous',
+                        roundness: 0.2
                     }
                 },
                 physics: {
                     enabled: true,
                     barnesHut: {
-                        gravitationalConstant: -2000,
-                        centralGravity: 0.3,
-                        springLength: 95,
-                        springConstant: 0.04,
-                        damping: 0.09,
-                        avoidOverlap: 0.1
+                        gravitationalConstant: -3000,
+                        centralGravity: 0.1,
+                        springLength: 150,
+                        springConstant: 0.02,
+                        damping: 0.15,
+                        avoidOverlap: 0.2
                     },
                     stabilization: {
                         enabled: true,
-                        iterations: 100
+                        iterations: 200,
+                        updateInterval: 25
                     }
                 },
                 interaction: {
                     dragNodes: true,
                     dragView: true,
                     zoomView: true,
-                    hover: true
+                    hover: true,
+                    tooltipDelay: 200
+                },
+                layout: {
+                    improvedLayout: true
                 }
             };
 
             const network = new vis.Network(container, data, options);
 
-            // Add some interactivity
+            // Enhanced interactivity
             network.on('click', function(params) {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
-                    console.log('Clicked node:', nodeId);
+                    const node = nodes.find(n => n.id === nodeId);
+                    console.log('Clicked node:', nodeId, node);
                 }
             });
+
+            network.on('hoverNode', function(params) {
+                container.style.cursor = 'pointer';
+            });
+
+            network.on('blurNode', function(params) {
+                container.style.cursor = 'default';
+            });
+
+            return network;
         }
 
         // Check server health and load last session on load

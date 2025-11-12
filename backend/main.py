@@ -151,6 +151,29 @@ async def get_memory_stats():
     """Get memory system statistics"""
     return memory_manager.get_memory_stats()
 
+@app.get("/api/neural-mesh/full")
+async def get_full_neural_mesh():
+    """Get complete neural mesh data for visualization"""
+    try:
+        # Get the neural mesh data directly from the loaded instance
+        neural_mesh = memory_manager.neural_mesh
+
+        # Convert edges dict to serializable format for frontend
+        edges_serializable = {}
+        for (node_a, node_b), edge_data in neural_mesh.edges.items():
+            edge_key = f"{node_a}::{node_b}"
+            edges_serializable[edge_key] = edge_data
+
+        # Return structured data for frontend visualization
+        return {
+            "nodes": neural_mesh.nodes,
+            "edges": edges_serializable,
+            "stats": neural_mesh.get_mesh_stats()
+        }
+    except Exception as e:
+        logger.error(f"Error loading neural mesh data: {e}")
+        return {"error": "Failed to load neural mesh data"}
+
 @app.get("/api/memory/search")
 async def search_memory(query: str, top_k: int = 5):
     """Search memory for similar content"""
