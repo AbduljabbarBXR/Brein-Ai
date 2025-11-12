@@ -1,0 +1,69 @@
+{
+  "version": "1.0",
+  "description": "SAL integration configuration for prompt optimization and dynamic adaptation",
+  "sal_events": {
+    "prompt_performance_tracking": {
+      "enabled": true,
+      "metrics": ["response_quality", "user_satisfaction", "processing_time", "relevance_score"],
+      "thresholds": {
+        "low_performance": 0.6,
+        "optimization_trigger": 0.5
+      }
+    },
+    "system_health_adaptation": {
+      "enabled": true,
+      "health_states": ["healthy", "degraded", "critical"],
+      "adaptation_rules": {
+        "degraded": {
+          "simplify_prompts": true,
+          "reduce_complexity": true,
+          "fallback_responses": true
+        },
+        "critical": {
+          "use_basic_prompts": true,
+          "minimal_processing": true,
+          "error_responses_only": true
+        }
+      }
+    },
+    "context_awareness": {
+      "enabled": true,
+      "context_factors": ["user_expertise", "query_complexity", "emotional_state", "conversation_history"],
+      "adaptation_triggers": {
+        "expert_user": "increase_technical_depth",
+        "emotional_distress": "prioritize_empathy",
+        "complex_query": "enhance_reasoning",
+        "repeated_topic": "provide_deeper_insights"
+      }
+    }
+  },
+  "optimization_rules": {
+    "a_b_testing": {
+      "enabled": false,
+      "test_groups": ["control", "variant_a", "variant_b"],
+      "metrics": ["user_preference", "response_quality", "engagement_time"],
+      "confidence_threshold": 0.95
+    },
+    "performance_monitoring": {
+      "enabled": true,
+      "update_interval": 3600,
+      "retention_period": 604800,
+      "alert_thresholds": {
+        "performance_drop": 0.1,
+        "usage_anomaly": 2.0
+      }
+    },
+    "adaptive_learning": {
+      "enabled": true,
+      "learning_rate": 0.01,
+      "feedback_sources": ["user_ratings", "response_times", "follow_up_queries"],
+      "optimization_goals": ["maximize_satisfaction", "minimize_response_time", "improve_relevance"]
+    }
+  },
+  "event_subscriptions": [
+    "prompt.performance_*",
+    "sal.health_*",
+    "user.context_*",
+    "system.adaptation_*"
+  ]
+}

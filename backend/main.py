@@ -7,6 +7,8 @@ import os
 import json
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from contextlib import asynccontextmanager
+
 from memory_manager import MemoryManager
 from orchestrator import Orchestrator
 from chat_manager import ChatManager
@@ -22,7 +24,27 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Brein AI", description="Modular brain-inspired AI system with mobile sync")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    global orchestrator_initialized
+    logger.info("Starting Brein AI server...")
+
+    try:
+        # Initialize orchestrator with SAL connections
+        await orchestrator.initialize()
+        orchestrator_initialized = True
+        logger.info("Orchestrator initialized successfully with SAL integration")
+    except Exception as e:
+        logger.error(f"Failed to initialize orchestrator: {e}")
+        # Continue with degraded functionality
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down Brein AI server...")
+
+app = FastAPI(title="Brein AI", description="Modular brain-inspired AI system with mobile sync", lifespan=lifespan)
 
 # Add CORS middleware for frontend communication
 app.add_middleware(
@@ -43,6 +65,9 @@ web_fetcher = WebFetcher(memory_manager)
 audit_logger = AuditLogger()
 test_harness = TestHarness(memory_manager, orchestrator)
 performance_profiler = PerformanceProfiler()
+
+# Initialize orchestrator with SAL connections
+orchestrator_initialized = False
 
 # Pydantic models for API requests
 class QueryRequest(BaseModel):

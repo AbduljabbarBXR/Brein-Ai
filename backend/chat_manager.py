@@ -14,11 +14,16 @@ class ChatManager:
     Manages chat sessions and messages with persistent storage.
     """
 
-    def __init__(self, db_path: str = "chats/brein_chats.db"):
+    def __init__(self, db_path: str = "chats/brein_chats.db", prompt_manager=None):
         self.db_path = db_path
         self.model_loader = GGUFModelLoader()
+        self.prompt_manager = prompt_manager
         self._ensure_db_exists()
         self._create_tables()
+
+    def set_prompt_manager(self, prompt_manager):
+        """Set the prompt manager after initialization"""
+        self.prompt_manager = prompt_manager
 
     def _ensure_db_exists(self):
         """Ensure the database directory exists."""
@@ -68,8 +73,13 @@ class ChatManager:
     def generate_smart_title(self, first_query: str) -> str:
         """Generate a smart title for the chat based on the first query."""
         try:
-            # Use AI to generate a concise title
-            prompt = f"Generate a very short, descriptive title (3-6 words) for a conversation that starts with this question: '{first_query}'. Make it sound like a topic or request summary."
+            # Use prompt manager for title generation
+            if self.prompt_manager:
+                prompt = self.prompt_manager.get_prompt("system.chat_management.smart_title_generation",
+                                                      first_query=first_query)
+            else:
+                # Fallback to hardcoded prompt
+                prompt = f"Generate a very short, descriptive title (3-6 words) for a conversation that starts with this question: '{first_query}'. Make it sound like a topic or request summary."
 
             title = self.model_loader.generate(
                 "llama-3.2",

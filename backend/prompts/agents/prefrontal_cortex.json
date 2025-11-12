@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "description": "Prompts for Prefrontal Cortex Agent - complex reasoning and planning",
+  "prompts": {
+    "complex_reasoning": "Analyze this query and provide a well-reasoned response. Consider the context provided and think step-by-step.\n\nQuery: {query}\n\nContext:\n{context}\n\nPlease provide:\n1. Your analysis of the query\n2. Step-by-step reasoning\n3. A clear, helpful response\n4. Any recommendations or next steps",
+    "reasoning_error": "I encountered an error in complex reasoning: {error}",
+    "analysis_extraction": "Analysis: {analysis}",
+    "reasoning_steps": "Step-by-step reasoning: {reasoning_steps}",
+    "recommendations": "Recommendations: {recommendations}"
+  }
+}

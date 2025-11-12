@@ -94,9 +94,10 @@ class HippocampusAgent:
     Now uses Llama-3.2 for intelligent content processing and summarization.
     """
 
-    def __init__(self, memory_manager: MemoryManager, model_loader: GGUFModelLoader):
+    def __init__(self, memory_manager: MemoryManager, model_loader: GGUFModelLoader, prompt_manager=None):
         self.memory = memory_manager
         self.model_loader = model_loader
+        self.prompt_manager = prompt_manager
         self.sal = None  # System Awareness Layer reference
 
     async def set_sal(self, sal):
@@ -151,12 +152,19 @@ class HippocampusAgent:
             Dictionary with ingestion results
         """
         try:
+            # Use prompt manager for content processing prompts
+            if self.prompt_manager:
+                summary_prompt = self.prompt_manager.get_prompt("agents.hippocampus.content_summary", content=content[:2000])
+                concepts_prompt = self.prompt_manager.get_prompt("agents.hippocampus.key_concepts_extraction", content=content[:1500])
+            else:
+                # Fallback to hardcoded prompts if prompt_manager not available
+                summary_prompt = f"Summarize the key information from this content in 2-3 sentences, focusing on facts and concepts that would be important to remember:\n\n{content[:2000]}..."
+                concepts_prompt = f"Extract 3-5 key concepts or topics from this content:\n\n{content[:1500]}..."
+
             # Use Llama-3.2 to analyze and summarize content for better memory encoding
-            summary_prompt = f"Summarize the key information from this content in 2-3 sentences, focusing on facts and concepts that would be important to remember:\n\n{content[:2000]}..."
             summary = self.model_loader.generate("llama-3.2", summary_prompt, max_tokens=128, temperature=0.3)
 
             # Extract key concepts for better searchability
-            concepts_prompt = f"Extract 3-5 key concepts or topics from this content:\n\n{content[:1500]}..."
             concepts_text = self.model_loader.generate("llama-3.2", concepts_prompt, max_tokens=64, temperature=0.2)
             key_concepts = [c.strip() for c in concepts_text.split(',') if c.strip()]
 
@@ -180,9 +188,10 @@ class HippocampusAgent:
 
         except Exception as e:
             logger.error(f"HippocampusAgent ingestion error: {e}")
+            error_msg = str(e) if self.prompt_manager else f"Error: {str(e)}"
             return {
                 "status": "error",
-                "error": str(e),
+                "error": error_msg,
                 "agent": "hippocampus"
             }
 
@@ -192,9 +201,10 @@ class PrefrontalCortexAgent:
     Uses Phi-3.1 model for advanced reasoning, problem-solving, and strategic thinking.
     """
 
-    def __init__(self, memory_manager: MemoryManager, model_loader: GGUFModelLoader):
+    def __init__(self, memory_manager: MemoryManager, model_loader: GGUFModelLoader, prompt_manager=None):
         self.memory = memory_manager
         self.model_loader = model_loader
+        self.prompt_manager = prompt_manager
         self.sal = None  # System Awareness Layer reference
 
     async def set_sal(self, sal):
@@ -250,8 +260,13 @@ class PrefrontalCortexAgent:
             # Build context from memory and session
             context_text = self._build_context_text(memory_context, session_context)
 
-            # Use Phi-3.1 for complex reasoning
-            reasoning_prompt = f"""Analyze this query and provide a well-reasoned response. Consider the context provided and think step-by-step.
+            # Use prompt manager for complex reasoning prompt
+            if self.prompt_manager:
+                reasoning_prompt = self.prompt_manager.get_prompt("agents.prefrontal_cortex.complex_reasoning",
+                                                                query=query, context=context_text)
+            else:
+                # Fallback to hardcoded prompt
+                reasoning_prompt = f"""Analyze this query and provide a well-reasoned response. Consider the context provided and think step-by-step.
 
 Query: {query}
 
@@ -343,8 +358,9 @@ class AmygdalaAgent:
     Uses TinyLlama for natural, conversational responses with emotional awareness.
     """
 
-    def __init__(self, model_loader: GGUFModelLoader):
+    def __init__(self, model_loader: GGUFModelLoader, prompt_manager=None):
         self.model_loader = model_loader
+        self.prompt_manager = prompt_manager
         self.sal = None  # System Awareness Layer reference
 
     async def set_sal(self, sal):
@@ -388,6 +404,7 @@ class AmygdalaAgent:
                                           memory_insights: List[str] = None) -> Dict[str, Any]:
         """
         Generate emotionally intelligent, personality-driven responses.
+        Now includes identity and self-awareness responses for Brein AI.
 
         Args:
             query: User query
@@ -398,8 +415,40 @@ class AmygdalaAgent:
             Dictionary with personality response
         """
         try:
-            # Build personality prompt with emotional awareness
-            personality_prompt = f"""You are a helpful, empathetic AI assistant with a warm personality. Respond naturally and conversationally to this query, considering the emotional context.
+            # Check if this is an identity/architecture/awareness question
+            query_lower = query.lower()
+            identity_keywords = ['who are you', 'what are you', 'what is your', 'architecture', 'awareness', 'brain', 'brein']
+
+            is_identity_question = any(keyword in query_lower for keyword in identity_keywords)
+
+            if self.prompt_manager and is_identity_question:
+                # Use identity prompts for self-description
+                if 'architecture' in query_lower:
+                    response = self.prompt_manager.get_prompt("core.identity.architecture_overview")
+                elif 'awareness' in query_lower or 'aware' in query_lower:
+                    response = self.prompt_manager.get_prompt("core.identity.awareness_description")
+                else:
+                    response = self.prompt_manager.get_prompt("core.identity.who_am_i")
+
+                return {
+                    "response": response,
+                    "emotional_tone": "confident",
+                    "personality_traits": ["self-aware", "intelligent", "transparent"],
+                    "model_used": "tinyllama",
+                    "confidence": 0.9,
+                    "agent": "amygdala"
+                }
+
+            # Use prompt manager for personality response prompt
+            if self.prompt_manager:
+                relevant_memories = ', '.join(memory_insights) if memory_insights else ''
+                personality_prompt = self.prompt_manager.get_prompt("agents.amygdala.personality_response",
+                                                                  query=query,
+                                                                  emotional_context=f"{emotional_context.get('tone', 'neutral')}, {emotional_context.get('urgency', 'normal')}",
+                                                                  relevant_memories=relevant_memories)
+            else:
+                # Fallback to hardcoded prompt
+                personality_prompt = f"""You are a helpful, empathetic AI assistant with a warm personality. Respond naturally and conversationally to this query, considering the emotional context.
 
 Query: {query}
 
@@ -452,18 +501,21 @@ class ThalamusRouter:
     Acts as the brain's relay center for intelligent model selection.
     """
 
-    def __init__(self, model_loader: GGUFModelLoader):
+    def __init__(self, model_loader: GGUFModelLoader, prompt_manager=None):
         self.model_loader = model_loader
+        self.prompt_manager = prompt_manager
         self.sal = None  # System Awareness Layer reference
 
-    def set_sal(self, sal):
+    async def set_sal(self, sal):
         """Connect to System Awareness Layer for inter-brain communication"""
         self.sal = sal
 
         # Update SAL state
         if self.sal:
-            # Note: Since ThalamusRouter methods are not async, we can't use await here
-            # The SAL state will be updated when routing occurs
+            await self.sal.brain_state.update_component_state('thalamus_router', {
+                'status': 'connected',
+                'health_status': 'healthy'
+            })
             logger.info("ThalamusRouter connected to SAL")
 
     def route_query(self, query: str, memory_results: List[Dict]) -> Dict[str, Any]:
@@ -478,6 +530,16 @@ class ThalamusRouter:
             Routing decision with model selection
         """
         try:
+            # Check for identity questions first (highest priority)
+            if self._is_identity_question(query):
+                return {
+                    "model": "tinyllama",
+                    "agent": "amygdala",
+                    "complexity_score": 0.0,
+                    "reasoning": "Identity or self-awareness question detected - routing to amygdala for appropriate response",
+                    "estimated_tokens": 150
+                }
+
             # Analyze query complexity
             complexity_score = self._analyze_complexity(query, memory_results)
 
@@ -542,6 +604,16 @@ class ThalamusRouter:
         complexity += min(tech_matches * 0.15, 0.3)
 
         return min(complexity, 1.0)
+
+    def _is_identity_question(self, query: str) -> bool:
+        """Check if query is about AI identity, architecture, or self-awareness."""
+        identity_indicators = [
+            'who are you', 'what are you', 'what is your', 'tell me about yourself',
+            'architecture', 'awareness', 'aware', 'brain', 'brein', 'system',
+            'how do you work', 'how are you built', 'what makes you'
+        ]
+        query_lower = query.lower()
+        return any(indicator in query_lower for indicator in identity_indicators)
 
     def _requires_emotional_intelligence(self, query: str) -> bool:
         """Check if query requires emotional intelligence."""

@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "description": "Prompts for Hippocampus Agent - memory processing and content ingestion",
+  "prompts": {
+    "content_summary": "Summarize the key information from this content in 2-3 sentences, focusing on facts and concepts that would be important to remember:\n\n{content}",
+    "key_concepts_extraction": "Extract 3-5 key concepts or topics from this content:\n\n{content}",
+    "memory_ingestion_success": "Content successfully ingested into memory. Created {chunks_created} memory chunks with key concepts: {key_concepts}. Summary: {summary}",
+    "memory_ingestion_error": "Failed to ingest content into memory: {error}"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "description": "Prompt versioning configuration for Brein AI prompt management",
+  "versioning": {
+    "enabled": true,
+    "track_usage": true,
+    "auto_backup": true,
+    "rollback_enabled": true
+  },
+  "current_versions": {
+    "core.identity": "1.0",
+    "core.awareness": "1.0",
+    "core.architecture": "1.0",
+    "agents.hippocampus": "1.0",
+    "agents.prefrontal_cortex": "1.0",
+    "agents.amygdala": "1.0",
+    "agents.thalamus": "1.0",
+    "system.chat_management": "1.0",
+    "system.orchestrator": "1.0"
+  },
+  "version_history": {
+    "core.identity": [
+      {
+        "version": "1.0",
+        "date": "2025-11-12",
+        "changes": "Initial identity prompts with brain-inspired architecture descriptions"
+      }
+    ],
+    "core.awareness": [
+      {
+        "version": "1.0",
+        "date": "2025-11-12",
+        "changes": "Initial self-awareness prompts with SAL integration"
+      }
+    ]
+  }
+}

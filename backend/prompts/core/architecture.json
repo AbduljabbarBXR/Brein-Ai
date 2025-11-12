@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "description": "Architecture description prompts for Brein AI - detailed explanations of brain-inspired components",
+  "prompts": {
+    "hippocampus_description": "The Hippocampus component handles advanced memory processing:\n\n• Encodes new information into retrievable memory representations\n• Manages contextual recall and association retrieval\n• Processes content for long-term storage and quick access\n• Integrates new knowledge with existing memory networks\n• Supports episodic and semantic memory formation",
+    "prefrontal_cortex_description": "The Prefrontal Cortex manages complex cognitive processing:\n\n• Handles strategic planning and decision-making\n• Performs advanced reasoning and problem-solving\n• Manages working memory for complex tasks\n• Coordinates multi-step cognitive processes\n• Integrates information from multiple sources for comprehensive analysis",
+    "amygdala_description": "The Amygdala provides emotional intelligence and personality:\n\n• Processes emotional context and social cues\n• Generates personality-driven, empathetic responses\n• Assesses emotional tone and urgency in interactions\n• Enhances communication with emotional awareness\n• Adapts response style based on emotional context",
+    "thalamus_description": "The Thalamus Router serves as the central coordination hub:\n\n• Analyzes query complexity and requirements\n• Routes requests to appropriate cognitive components\n• Assesses processing needs and resource allocation\n• Coordinates between different brain regions\n• Optimizes processing pathways for efficiency",
+    "sal_description": "The System Awareness Layer (SAL) provides overarching coordination:\n\n• Monitors real-time system health and performance\n• Enables inter-component communication and synchronization\n• Manages adaptive behavior based on system state\n• Coordinates cognitive processes across all regions\n• Provides self-monitoring and optimization capabilities",
+    "integration_explanation": "These components work together through sophisticated integration:\n\n• SAL coordinates all brain regions for unified operation\n• Thalamus routes information to appropriate specialists\n• Components share context through awareness layer\n• Memory informs reasoning and emotional responses\n• Continuous feedback loops enable adaptive behavior\n• Result: Coherent, context-aware, and intelligent assistance"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "description": "Prompts for Orchestrator - query processing and response generation",
+  "prompts": {
+    "internal_reasoning": "Think step by step about how to answer: {query}\n\nList the key points to cover in plain text:",
+    "standard_response": "Provide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose.",
+    "contextual_response": "Using this context:\n{context}\n\nProvide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose.",
+    "thought_trace_complex": "Complex reasoning activated.\n\nAnalysis: {analysis}\n\nStep-by-step reasoning: {reasoning_steps}\n\nDecision making: Query routed to prefrontal cortex due to complexity score of {complexity_score:.2f}. Using advanced reasoning capabilities.",
+    "thought_trace_emotional": "Emotional processing activated.\n\nEmotional context analysis: Detected tone '{emotional_tone}' with urgency level '{urgency}'.\n\nMemory insights considered: {memory_insights}\n\nPersonality response strategy: Using emotional intelligence to generate empathetic, conversational response.",
+    "thought_trace_standard": "Internal reasoning: {cleaned_thought}\n\nQuery routing: Complexity score {complexity_score:.2f} determined standard processing appropriate.{memory_context_info}\n\nResponse generation: Created helpful response using memory-augmented context and step-by-step reasoning.",
+    "processing_error": "Query processing failed: {error}"
+  }
+}

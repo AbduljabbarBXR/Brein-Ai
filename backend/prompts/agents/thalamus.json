@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "description": "Prompts for Thalamus Router - query routing and complexity assessment",
+  "prompts": {
+    "routing_error": "Error in routing: {error}",
+    "complexity_high": "Query routed to prefrontal cortex due to complexity score of {complexity_score:.2f}. Using advanced reasoning capabilities.",
+    "complexity_medium": "Query routed to amygdala due to emotional intelligence requirements.",
+    "complexity_low": "Query handled with standard processing through hippocampus.",
+    "routing_success": "Query successfully routed to {agent} with complexity score {complexity_score:.2f}"
+  }
+}

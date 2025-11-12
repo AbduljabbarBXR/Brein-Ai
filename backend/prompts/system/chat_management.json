@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "description": "Prompts for chat management - session titles and conversation handling",
+  "prompts": {
+    "smart_title_generation": "Generate a very short, descriptive title (3-6 words) for a conversation that starts with this question: '{first_query}'. Make it sound like a topic or request summary.",
+    "title_fallback": "Untitled Chat",
+    "title_truncation": "{truncated_words}...",
+    "session_error": "Unable to manage chat session: {error}"
+  }
+}

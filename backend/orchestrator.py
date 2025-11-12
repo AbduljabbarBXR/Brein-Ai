@@ -14,6 +14,7 @@ from memory_transformer import MemoryTransformer
 from neural_mesh import NeuralMesh
 from neural_mesh import NeuralMesh
 from sal import SystemAwarenessLayer
+from prompt_manager import PromptManager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,16 +37,19 @@ class Orchestrator:
         # Initialize GGUF model loader
         self.model_loader = GGUFModelLoader()
 
-        # Initialize agents with model integration and SAL awareness
-        self.hippocampus = HippocampusAgent(memory_manager, self.model_loader)
+        # Initialize Prompt Manager (SAL connection will be established later)
+        self.prompt_manager = PromptManager(prompts_dir="prompts", sal=None)  # Don't pass SAL yet
+
+        # Initialize agents with model integration and prompt manager (SAL connection later)
+        self.hippocampus = HippocampusAgent(memory_manager, self.model_loader, self.prompt_manager)
         self.memory_transformer = MemoryTransformer()
         self.neural_mesh = NeuralMesh()
-        self.prefrontal_cortex = PrefrontalCortexAgent(memory_manager, self.model_loader)
-        self.amygdala = AmygdalaAgent(self.model_loader)
-        self.thalamus_router = ThalamusRouter(self.model_loader)
+        self.prefrontal_cortex = PrefrontalCortexAgent(memory_manager, self.model_loader, self.prompt_manager)
+        self.amygdala = AmygdalaAgent(self.model_loader, self.prompt_manager)
+        self.thalamus_router = ThalamusRouter(self.model_loader, self.prompt_manager)
 
-        # Connect agents to SAL for inter-brain communication
-        self._connect_agents_to_sal()
+        # Update chat manager with prompt manager
+        self.chat_manager.set_prompt_manager(self.prompt_manager)
 
         # Legacy agents for compatibility
         self.cortex = None  # Will be handled by routing
@@ -53,22 +57,45 @@ class Orchestrator:
 
         self.session_context = {}  # Keep for backward compatibility, but prefer chat_manager
 
+    async def initialize(self):
+        """Async initialization method to set up SAL connections"""
+        try:
+            # Connect PromptManager to SAL
+            if self.prompt_manager and self.sal:
+                self.prompt_manager.sal = self.sal  # Set SAL reference
+                await self.prompt_manager._connect_to_sal()
+
+            # Connect agents to SAL for inter-brain communication
+            await self._connect_agents_to_sal()
+
+            logger.info("Orchestrator fully initialized with SAL integration")
+
+        except Exception as e:
+            logger.error(f"Orchestrator initialization failed: {e}")
+            # Continue with degraded functionality
+
     async def _connect_agents_to_sal(self):
         """Connect all agents to the System Awareness Layer"""
-        # Initialize SAL if not already done
-        if not self.sal.is_initialized:
-            sal_initialized = await self.sal.initialize()
-            if not sal_initialized:
-                logger.warning("Failed to initialize System Awareness Layer")
-                return
+        try:
+            # Initialize SAL if not already done
+            if not self.sal.is_initialized:
+                logger.info("Initializing System Awareness Layer...")
+                sal_initialized = await self.sal.initialize()
+                if not sal_initialized:
+                    logger.error("Failed to initialize System Awareness Layer")
+                    return
 
-        # Connect each agent to SAL
-        await self.hippocampus.set_sal(self.sal)
-        await self.prefrontal_cortex.set_sal(self.sal)
-        await self.amygdala.set_sal(self.sal)
-        await self.thalamus_router.set_sal(self.sal)
+            # Connect each agent to SAL
+            await self.hippocampus.set_sal(self.sal)
+            await self.prefrontal_cortex.set_sal(self.sal)
+            await self.amygdala.set_sal(self.sal)
+            await self.thalamus_router.set_sal(self.sal)
 
-        logger.info("All brain agents connected to System Awareness Layer")
+            logger.info("All brain agents connected to System Awareness Layer")
+
+        except Exception as e:
+            logger.error(f"Error connecting agents to SAL: {e}")
+            # Continue without SAL - system will work in degraded mode
 
     async def process_query(self, query: str, session_id: Optional[str] = None, enable_web_access: bool = False) -> Dict:
         """
@@ -135,14 +162,25 @@ Personality response strategy: Using TinyLlama model to generate empathetic, con
             else:
                 # Standard processing - use Llama-3.2 via Hippocampus for general queries
                 # Generate internal thought process first
-                thought_prompt = f"Think step by step about how to answer: {query}\n\nList the key points to cover in plain text:"
+                if self.prompt_manager:
+                    thought_prompt = self.prompt_manager.get_prompt("system.orchestrator.internal_reasoning", query=query)
+                else:
+                    thought_prompt = f"Think step by step about how to answer: {query}\n\nList the key points to cover in plain text:"
                 internal_thought = self.model_loader.generate("llama-3.2", thought_prompt, max_tokens=256, temperature=0.5)
 
                 # Create response using memory context
-                prompt = f"Provide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose."
                 if relevant_memory_chunks:
                     context = "\n".join([f"Memory: {chunk['content'][:200]}" for chunk in relevant_memory_chunks[:2]])
-                    prompt = f"Using this context:\n{context}\n\nProvide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose."
+                    if self.prompt_manager:
+                        prompt = self.prompt_manager.get_prompt("system.orchestrator.contextual_response",
+                                                              context=context, query=query)
+                    else:
+                        prompt = f"Using this context:\n{context}\n\nProvide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose."
+                else:
+                    if self.prompt_manager:
+                        prompt = self.prompt_manager.get_prompt("system.orchestrator.standard_response", query=query)
+                    else:
+                        prompt = f"Provide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose."
 
                 response_text = self.model_loader.generate("llama-3.2", prompt, max_tokens=512, temperature=0.6)
                 agent_result = {
