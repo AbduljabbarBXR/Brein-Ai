@@ -106,6 +106,8 @@ async def health_check():
 @app.post("/api/query")
 async def handle_query(request: QueryRequest):
     """Handle user queries with memory augmentation and optional web access"""
+    import asyncio
+
     # Audit log the query operation
     audit_logger.log_operation(
         operation_type="user_query",
@@ -117,18 +119,27 @@ async def handle_query(request: QueryRequest):
         }
     )
 
-    result = await orchestrator.process_query(request.query, request.session_id, request.enable_web_access)
-
-    # Log memory operations if any
-    if result.get("memory_chunks"):
-        audit_logger.log_memory_operation(
-            operation="retrieve",
-            node_ids=[chunk["node_id"] for chunk in result["memory_chunks"]],
-            user_id="user",
-            session_id=request.session_id
+    try:
+        # Add 30-second timeout to prevent server hangs
+        result = await asyncio.wait_for(
+            orchestrator.process_query(request.query, request.session_id, request.enable_web_access),
+            timeout=30.0
         )
 
-    return result
+        # Log memory operations if any
+        if result.get("memory_chunks"):
+            audit_logger.log_memory_operation(
+                operation="retrieve",
+                node_ids=[chunk["node_id"] for chunk in result["memory_chunks"]],
+                user_id="user",
+                session_id=request.session_id
+            )
+
+        return result
+
+    except asyncio.TimeoutError:
+        logger.error(f"Query timeout for session {request.session_id}: {request.query[:100]}...")
+        raise HTTPException(status_code=504, detail="Query processing timed out. Please try again.")
 
 @app.post("/api/ingest")
 async def ingest_content(request: IngestRequest):

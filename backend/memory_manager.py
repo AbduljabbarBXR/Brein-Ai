@@ -303,9 +303,13 @@ class MemoryManager:
         # Apply Hebbian reinforcement for co-activated nodes
         if len(activated_nodes) > 1 and use_mesh_expansion:
             node_list = list(activated_nodes)
+            # Calculate stronger reinforcement based on search relevance
+            avg_score = sum(result["score"] for result in results) / len(results)
+            reinforcement_strength = min(0.2, avg_score * 0.3)  # Much stronger reinforcement
+
             for i in range(len(node_list)):
                 for j in range(i+1, len(node_list)):
-                    self.neural_mesh.reinforce_connection(node_list[i], node_list[j], 0.05)
+                    self.neural_mesh.reinforce_connection(node_list[i], node_list[j], reinforcement_strength)
 
         # Expand results using neural mesh if requested
         if use_mesh_expansion and results:

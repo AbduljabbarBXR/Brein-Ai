@@ -20,7 +20,7 @@ class GGUFModelLoader:
         self.models = {}  # Cache loaded models
         self.model_paths = {
             "phi-3.1": os.path.join("..", "models", "Phi-3.1-mini-128k-instruct-Q4_K_M.gguf"),
-            "tinyllama": os.path.join("..", "models", "tinyllama-1.1b-chat-v1.0-q4_k_m.gguf"),
+            "hermes": os.path.join("..", "models", "Hermes-3-Llama-3.2-3B.Q4_K_M.gguf"),
             "llama-3.2": os.path.join("..", "models", "llama-3.2-1b-instruct-q4_k_m.gguf")
         }
 
@@ -61,8 +61,8 @@ class GGUFModelLoader:
             # Create chat format based on model
             if model_name == "phi-3.1":
                 formatted_prompt = f"<|user|>\n{prompt}<|end|>\n<|assistant|>"
-            elif model_name == "tinyllama":
-                formatted_prompt = f"<|user|>\n{prompt}</s>\n<|assistant|>"
+            elif model_name == "hermes":
+                formatted_prompt = f"<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
             elif model_name == "llama-3.2":
                 formatted_prompt = f"<|start_header_id|>user<|end_header_id|>\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
             else:
@@ -434,7 +434,7 @@ class AmygdalaAgent:
                     "response": response,
                     "emotional_tone": "confident",
                     "personality_traits": ["self-aware", "intelligent", "transparent"],
-                    "model_used": "tinyllama",
+                    "model_used": "hermes",
                     "confidence": 0.9,
                     "agent": "amygdala"
                 }
@@ -458,7 +458,7 @@ Emotional Context: {emotional_context.get('tone', 'neutral')}, {emotional_contex
 
 Respond in a friendly, engaging way that shows you understand and care about the user's needs."""
 
-            response = self.model_loader.generate("tinyllama", personality_prompt, max_tokens=256, temperature=0.8)
+            response = self.model_loader.generate("hermes", personality_prompt, max_tokens=256, temperature=0.8)
 
             # Analyze emotional tone of response
             emotional_tone = self._analyze_emotional_tone(response)
@@ -467,7 +467,7 @@ Respond in a friendly, engaging way that shows you understand and care about the
                 "response": response,
                 "emotional_tone": emotional_tone,
                 "personality_traits": ["empathetic", "helpful", "conversational"],
-                "model_used": "tinyllama",
+                "model_used": "hermes",
                 "confidence": 0.75,
                 "agent": "amygdala"
             }
@@ -478,7 +478,7 @@ Respond in a friendly, engaging way that shows you understand and care about the
                 "response": f"I'm here to help! {query}",
                 "emotional_tone": "supportive",
                 "personality_traits": ["empathetic", "helpful"],
-                "model_used": "tinyllama",
+                "model_used": "hermes",
                 "confidence": 0.0,
                 "agent": "amygdala"
             }
@@ -533,7 +533,7 @@ class ThalamusRouter:
             # Check for identity questions first (highest priority)
             if self._is_identity_question(query):
                 return {
-                    "model": "tinyllama",
+                    "model": "hermes",
                     "agent": "amygdala",
                     "complexity_score": 0.0,
                     "reasoning": "Identity or self-awareness question detected - routing to amygdala for appropriate response",
@@ -551,7 +551,7 @@ class ThalamusRouter:
                 reasoning = "Query requires complex reasoning and planning"
             elif self._requires_emotional_intelligence(query):
                 # Emotional/social intelligence needed
-                model_choice = "tinyllama"
+                model_choice = "hermes"
                 agent = "amygdala"
                 reasoning = "Query benefits from emotional intelligence and personality"
             else:
