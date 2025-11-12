@@ -13,6 +13,7 @@ from agents import (
 from memory_transformer import MemoryTransformer
 from neural_mesh import NeuralMesh
 from neural_mesh import NeuralMesh
+from sal import SystemAwarenessLayer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -29,10 +30,13 @@ class Orchestrator:
         self.memory_transformer = MemoryTransformer()
         self.neural_mesh = NeuralMesh()
 
+        # Initialize System Awareness Layer (SAL)
+        self.sal = SystemAwarenessLayer()
+
         # Initialize GGUF model loader
         self.model_loader = GGUFModelLoader()
 
-        # Initialize agents with model integration
+        # Initialize agents with model integration and SAL awareness
         self.hippocampus = HippocampusAgent(memory_manager, self.model_loader)
         self.memory_transformer = MemoryTransformer()
         self.neural_mesh = NeuralMesh()
@@ -40,11 +44,31 @@ class Orchestrator:
         self.amygdala = AmygdalaAgent(self.model_loader)
         self.thalamus_router = ThalamusRouter(self.model_loader)
 
+        # Connect agents to SAL for inter-brain communication
+        self._connect_agents_to_sal()
+
         # Legacy agents for compatibility
         self.cortex = None  # Will be handled by routing
         self.basal_ganglia = None  # Will be handled by routing
 
         self.session_context = {}  # Keep for backward compatibility, but prefer chat_manager
+
+    async def _connect_agents_to_sal(self):
+        """Connect all agents to the System Awareness Layer"""
+        # Initialize SAL if not already done
+        if not self.sal.is_initialized:
+            sal_initialized = await self.sal.initialize()
+            if not sal_initialized:
+                logger.warning("Failed to initialize System Awareness Layer")
+                return
+
+        # Connect each agent to SAL
+        await self.hippocampus.set_sal(self.sal)
+        await self.prefrontal_cortex.set_sal(self.sal)
+        await self.amygdala.set_sal(self.sal)
+        await self.thalamus_router.set_sal(self.sal)
+
+        logger.info("All brain agents connected to System Awareness Layer")
 
     async def process_query(self, query: str, session_id: Optional[str] = None, enable_web_access: bool = False) -> Dict:
         """

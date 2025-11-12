@@ -97,6 +97,47 @@ class HippocampusAgent:
     def __init__(self, memory_manager: MemoryManager, model_loader: GGUFModelLoader):
         self.memory = memory_manager
         self.model_loader = model_loader
+        self.sal = None  # System Awareness Layer reference
+
+    async def set_sal(self, sal):
+        """Connect to System Awareness Layer for inter-brain communication"""
+        self.sal = sal
+
+        # Subscribe to relevant events
+        if self.sal:
+            await self.sal.event_bus.subscribe("amygdala.emotional_*", self.on_emotional_update)
+            await self.sal.event_bus.subscribe("prefrontal_cortex.reasoning_*", self.on_reasoning_context)
+            await self.sal.event_bus.subscribe("sal.resource_*", self.on_resource_request)
+
+            # Update SAL state
+            await self.sal.brain_state.update_component_state('hippocampus', {
+                'status': 'connected',
+                'health_status': 'healthy'
+            })
+
+    async def on_emotional_update(self, event: str, data: dict):
+        """Respond to emotional context updates from amygdala"""
+        if data.get('emotional_boost'):
+            # Adjust memory retrieval priority based on emotional context
+            self.emotional_memory_boost = data['emotional_boost']
+            logger.info(f"Hippocampus adjusting for emotional boost: {data['emotional_boost']}")
+
+    async def on_reasoning_context(self, event: str, data: dict):
+        """Respond to reasoning context from prefrontal cortex"""
+        if data.get('focus_areas'):
+            # Prioritize memory search in specific areas
+            self.focus_areas = data['focus_areas']
+            logger.info(f"Hippocampus focusing on areas: {data['focus_areas']}")
+
+    async def on_resource_request(self, event: str, data: dict):
+        """Handle resource requests from SAL"""
+        if data.get('resource_type') == 'memory':
+            # Provide memory usage information
+            memory_stats = self.memory.get_memory_stats()
+            await self.sal.brain_state.update_component_state('hippocampus', {
+                'memory_load': memory_stats.get('total_nodes', 0),
+                'last_resource_check': data.get('timestamp')
+            })
 
     async def ingest_content(self, content: str, content_type: str = "stable") -> Dict[str, Any]:
         """
@@ -154,6 +195,44 @@ class PrefrontalCortexAgent:
     def __init__(self, memory_manager: MemoryManager, model_loader: GGUFModelLoader):
         self.memory = memory_manager
         self.model_loader = model_loader
+        self.sal = None  # System Awareness Layer reference
+
+    async def set_sal(self, sal):
+        """Connect to System Awareness Layer for inter-brain communication"""
+        self.sal = sal
+
+        # Subscribe to coordination events
+        if self.sal:
+            await self.sal.event_bus.subscribe("thalamus_router.complexity_*", self.on_complexity_assessment)
+            await self.sal.event_bus.subscribe("hippocampus.memory_*", self.on_memory_update)
+            await self.sal.event_bus.subscribe("amygdala.emotional_*", self.on_emotional_context)
+
+            # Update SAL state
+            await self.sal.brain_state.update_component_state('prefrontal_cortex', {
+                'status': 'connected',
+                'health_status': 'healthy'
+            })
+
+    async def on_complexity_assessment(self, event: str, data: dict):
+        """Respond to complexity assessments from thalamus router"""
+        if data.get('complexity_score', 0) >= 0.7:
+            # Prepare for complex reasoning task
+            self.reasoning_mode = 'complex'
+            logger.info(f"Prefrontal cortex preparing for complex reasoning: {data['complexity_score']}")
+
+    async def on_memory_update(self, event: str, data: dict):
+        """Respond to memory updates from hippocampus"""
+        if data.get('new_nodes'):
+            # Update reasoning context with new memory information
+            self.available_memory_nodes = data.get('new_nodes', [])
+            logger.info(f"Prefrontal cortex updated with {len(self.available_memory_nodes)} new memory nodes")
+
+    async def on_emotional_context(self, event: str, data: dict):
+        """Respond to emotional context from amygdala"""
+        if data.get('emotional_tone'):
+            # Adjust reasoning approach based on emotional context
+            self.emotional_context = data
+            logger.info(f"Prefrontal cortex adjusting for emotional context: {data['emotional_tone']}")
 
     async def process_complex_query(self, query: str, memory_context: List[Dict], session_context: Optional[List[Dict]] = None) -> Dict[str, Any]:
         """
@@ -266,6 +345,44 @@ class AmygdalaAgent:
 
     def __init__(self, model_loader: GGUFModelLoader):
         self.model_loader = model_loader
+        self.sal = None  # System Awareness Layer reference
+
+    async def set_sal(self, sal):
+        """Connect to System Awareness Layer for inter-brain communication"""
+        self.sal = sal
+
+        # Subscribe to relevant events
+        if self.sal:
+            await self.sal.event_bus.subscribe("hippocampus.memory_*", self.on_memory_context)
+            await self.sal.event_bus.subscribe("prefrontal_cortex.reasoning_*", self.on_reasoning_context)
+            await self.sal.event_bus.subscribe("thalamus_router.routing_*", self.on_routing_decision)
+
+            # Update SAL state
+            await self.sal.brain_state.update_component_state('amygdala', {
+                'status': 'connected',
+                'health_status': 'healthy'
+            })
+
+    async def on_memory_context(self, event: str, data: dict):
+        """Respond to memory context from hippocampus"""
+        if data.get('emotional_memory'):
+            # Enhance emotional processing with memory context
+            self.memory_emotional_context = data
+            logger.info("Amygdala enhanced with emotional memory context")
+
+    async def on_reasoning_context(self, event: str, data: dict):
+        """Respond to reasoning context from prefrontal cortex"""
+        if data.get('emotional_tone'):
+            # Adjust emotional response based on reasoning context
+            self.reasoning_emotional_context = data
+            logger.info(f"Amygdala adjusting for reasoning emotional context: {data['emotional_tone']}")
+
+    async def on_routing_decision(self, event: str, data: dict):
+        """Respond to routing decisions from thalamus router"""
+        if data.get('agent') == 'amygdala':
+            # Prepare for emotional processing task
+            self.active_emotional_task = True
+            logger.info("Amygdala activated for emotional processing")
 
     async def generate_personality_response(self, query: str, emotional_context: Dict[str, Any],
                                           memory_insights: List[str] = None) -> Dict[str, Any]:
@@ -337,6 +454,17 @@ class ThalamusRouter:
 
     def __init__(self, model_loader: GGUFModelLoader):
         self.model_loader = model_loader
+        self.sal = None  # System Awareness Layer reference
+
+    def set_sal(self, sal):
+        """Connect to System Awareness Layer for inter-brain communication"""
+        self.sal = sal
+
+        # Update SAL state
+        if self.sal:
+            # Note: Since ThalamusRouter methods are not async, we can't use await here
+            # The SAL state will be updated when routing occurs
+            logger.info("ThalamusRouter connected to SAL")
 
     def route_query(self, query: str, memory_results: List[Dict]) -> Dict[str, Any]:
         """

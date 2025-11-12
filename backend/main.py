@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import sys
 import os
+import json
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from memory_manager import MemoryManager
