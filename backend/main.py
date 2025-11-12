@@ -1,13 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import List, Dict, Any, Optional
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from memory_manager import MemoryManager
 from orchestrator import Orchestrator
-from model_exporter import ModelExporter
+from chat_manager import ChatManager
+# from model_exporter import ModelExporter  # Temporarily disabled - requires onnxruntime
 from sync_manager import SyncManager
 from web_fetcher import WebFetcher
 from audit_logger import AuditLogger
@@ -32,8 +34,9 @@ app.add_middleware(
 
 # Initialize core components
 memory_manager = MemoryManager(db_path="memory/brein_memory.db")
-orchestrator = Orchestrator(memory_manager)
-model_exporter = ModelExporter()
+chat_manager = ChatManager(db_path="chats/brein_chats.db")
+orchestrator = Orchestrator(memory_manager, chat_manager)
+# model_exporter = ModelExporter()  # Temporarily disabled - requires onnxruntime
 sync_manager = SyncManager()
 web_fetcher = WebFetcher(memory_manager)
 audit_logger = AuditLogger()
@@ -115,6 +118,53 @@ async def get_memory_stats():
 async def search_memory(query: str, top_k: int = 5):
     """Search memory for similar content"""
     return {"results": memory_manager.search_memory(query, top_k)}
+
+# Chat management endpoints
+@app.post("/api/chats")
+async def create_chat_session():
+    """Create a new chat session."""
+    session_id = chat_manager.create_chat_session()
+    return {"session_id": session_id, "status": "created"}
+
+@app.get("/api/chats")
+async def list_chat_sessions():
+    """Get all chat sessions."""
+    sessions = chat_manager.get_chat_sessions()
+    return {"chats": sessions}
+
+@app.get("/api/chats/{session_id}")
+async def get_chat_history(session_id: str):
+    """Get the full message history for a chat session."""
+    messages = chat_manager.get_chat_history(session_id)
+    session_info = chat_manager.get_session_info(session_id)
+
+    if not session_info:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    return {
+        "session": session_info,
+        "messages": messages
+    }
+
+@app.delete("/api/chats/{session_id}")
+async def delete_chat_session(session_id: str):
+    """Delete a chat session and all its messages."""
+    session_info = chat_manager.get_session_info(session_id)
+    if not session_info:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    chat_manager.delete_chat_session(session_id)
+    return {"status": "deleted", "session_id": session_id}
+
+@app.put("/api/chats/{session_id}/title")
+async def update_chat_title(session_id: str, title: str):
+    """Update the title of a chat session."""
+    session_info = chat_manager.get_session_info(session_id)
+    if not session_info:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    chat_manager.update_chat_title(session_id, title)
+    return {"status": "updated", "session_id": session_id, "title": title}
 
 # Mobile/Sync endpoints
 @app.post("/api/sync/register-device")
@@ -317,24 +367,24 @@ async def generate_performance_report():
     filepath = performance_profiler.save_performance_report()
     return {"report_path": filepath}
 
-# Model export endpoints
-@app.post("/api/models/export-mobile-bundle")
-async def export_mobile_bundle(bundle_name: str = "brein_mobile_v1"):
-    """Export models to mobile-friendly formats"""
-    exported_files = model_exporter.export_mobile_bundle(bundle_name)
-    return {"success": bool(exported_files), "files": exported_files}
+# Model export endpoints (temporarily disabled - requires onnxruntime)
+# @app.post("/api/models/export-mobile-bundle")
+# async def export_mobile_bundle(bundle_name: str = "brein_mobile_v1"):
+#     """Export models to mobile-friendly formats"""
+#     exported_files = model_exporter.export_mobile_bundle(bundle_name)
+#     return {"success": bool(exported_files), "files": exported_files}
 
-@app.post("/api/models/export-embedding")
-async def export_embedding_model(model_name: str = "all-MiniLM-L6-v2"):
-    """Export embedding model to ONNX"""
-    path = model_exporter.export_embedding_model(model_name)
-    return {"success": path is not None, "path": path}
+# @app.post("/api/models/export-embedding")
+# async def export_embedding_model(model_name: str = "all-MiniLM-L6-v2"):
+#     """Export embedding model to ONNX"""
+#     path = model_exporter.export_embedding_model(model_name)
+#     return {"success": path is not None, "path": path}
 
-@app.post("/api/models/export-transformer")
-async def export_memory_transformer():
-    """Export memory transformer to ONNX"""
-    path = model_exporter.export_memory_transformer()
-    return {"success": path is not None, "path": path}
+# @app.post("/api/models/export-transformer")
+# async def export_memory_transformer():
+#     """Export memory transformer to ONNX"""
+#     path = model_exporter.export_memory_transformer()
+#     return {"success": path is not None, "path": path}
 
 @app.get("/")
 async def root():

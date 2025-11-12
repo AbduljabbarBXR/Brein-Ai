@@ -4,310 +4,1918 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brein AI - Brain-Inspired AI System</title>
+    <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
     <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #343541;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
             margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: #333;
+            padding: 0;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        .main-layout {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .sidebar {
+            width: 250px;
+            background: #2c2c2e;
+            border-right: 1px solid #4e4e50;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+        }
+
+        .history-panel {
+            flex: 1;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .history-item {
+            padding: 10px 12px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .history-item:hover {
+            background: #404040;
+        }
+
+        .history-item.active {
+            background: #10a37f;
+            border-color: #0d9488;
+        }
+
+        .history-title {
+            font-size: 0.9em;
+            font-weight: 500;
+            margin-bottom: 2px;
+            white-space: nowrap;
             overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .header {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
+        .history-meta {
+            font-size: 0.75em;
+            opacity: 0.7;
         }
 
-        .header h1 {
-            margin: 0;
-            font-size: 2.5em;
-            font-weight: 300;
-        }
-
-        .header p {
-            margin: 10px 0 0 0;
-            opacity: 0.9;
-            font-size: 1.1em;
-        }
-
-        .chat-container {
-            display: flex;
-            flex-direction: column;
-            height: 70vh;
-            padding: 20px;
-        }
-
-        .output-section {
-            display: flex;
-            gap: 20px;
-            flex: 1;
-            margin-bottom: 20px;
-        }
-
-        .output-box {
-            flex: 1;
-            border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            padding: 15px;
-            background: #f8f9fa;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .output-box h3 {
-            margin: 0 0 15px 0;
-            color: #495057;
+        .sidebar h3 {
+            margin: 0 0 20px 0;
+            color: #fff;
             font-size: 1.2em;
             font-weight: 600;
+        }
+
+        .sidebar-item {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            color: #a1a1aa;
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
-        .output-content {
+        .sidebar-item:hover {
+            background: #404040;
+            color: #fff;
+        }
+
+        .sidebar-item.active {
+            background: #10a37f;
+            color: white;
+        }
+
+        .sidebar-item.history {
+            background: #dc2626;
+            color: white;
+        }
+
+        .sidebar-item.history:hover {
+            background: #b91c1c;
+        }
+
+        .sidebar-item.neural-network {
+            margin-top: auto;
+            padding-bottom: 20px;
+        }
+
+        .chat-container {
             flex: 1;
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            position: relative;
+        }
+
+        .chat-header {
+            padding: 10px 15px;
+            text-align: center;
+            border-bottom: 1px solid #4e4e50;
+            background: #2c2c2e;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .chat-header h1 {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .chat-header p {
+            opacity: 0.7;
+            font-size: 0.8em;
+        }
+
+        .messages-container {
+            flex: 1;
             overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            line-height: 1.5;
+            padding: 20px;
+            padding-bottom: 120px;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.ai {
+            justify-content: flex-start;
+        }
+
+        .message-bubble {
+            max-width: 80%;
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+            word-wrap: break-word;
             white-space: pre-wrap;
         }
 
-        .input-section {
+        .message.user .message-bubble {
+            background: #6b7280;
+            color: white;
+            text-align: right;
+            border-radius: 12px;
+            padding: 12px 16px;
+        }
+
+        .message.ai .message-bubble {
+            color: #fff;
+            text-align: left;
+        }
+
+        .thinking-indicator {
+            padding: 4px 8px;
+            font-size: 0.85em;
+            color: #a1a1aa;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
             display: flex;
-            gap: 10px;
+            align-items: center;
+            gap: 4px;
+            align-self: flex-start;
+            text-decoration: underline;
+        }
+
+        .thinking-indicator:hover {
+            color: #fff;
+        }
+
+        .thinking-content {
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            align-self: flex-start;
+            width: 100%;
+            min-height: auto;
+            max-height: none;
+            overflow: visible;
+            border-left: 2px solid #4e4e50;
+            margin-left: 8px;
+            color: #d1d5db;
+        }
+
+        .thinking-content.collapsed {
+            display: none;
+        }
+
+        .input-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #2c2c2e;
+            border-top: 1px solid #4e4e50;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
             align-items: center;
         }
 
-        .input-group {
-            flex: 1;
+        .input-wrapper {
+            max-width: 900px;
+            width: 100%;
+            position: relative;
             display: flex;
-            gap: 10px;
+            gap: 12px;
         }
 
         #user-input {
             flex: 1;
             padding: 12px 16px;
-            border: 2px solid #ced4da;
-            border-radius: 6px;
+            border: 1px solid #4e4e50;
+            border-radius: 25px;
+            background: #404040;
+            color: white;
             font-size: 16px;
-            transition: border-color 0.2s;
+            outline: none;
+            transition: border-color 0.2s ease;
         }
 
         #user-input:focus {
-            outline: none;
-            border-color: #4facfe;
+            border-color: #10a37f;
         }
 
-        .btn {
-            padding: 12px 24px;
+        #user-input::placeholder {
+            color: #9ca3af;
+        }
+
+        .send-btn {
+            padding: 12px 20px;
+            background: #10a37f;
+            color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 25px;
+            cursor: pointer;
             font-size: 16px;
             font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+
+        .send-btn:hover {
+            background: #0d9488;
+        }
+
+        .send-btn:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+        }
+
+        .clear-btn {
+            padding: 8px 16px;
+            background: transparent;
+            color: #9ca3af;
+            border: 1px solid #4e4e50;
+            border-radius: 20px;
             cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-
-        .status {
-            padding: 8px 12px;
-            background: #d4edda;
-            color: #155724;
-            border-radius: 4px;
             font-size: 14px;
-            margin-top: 10px;
+            transition: all 0.2s ease;
         }
 
-        .loading {
+        .clear-btn:hover {
+            background: #4e4e50;
+            color: white;
+        }
+
+        .loading-dots {
             display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #4facfe;
+            width: 4px;
+            height: 4px;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            background: currentColor;
+            animation: loading 1.4s infinite ease-in-out;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .loading-dots:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading-dots:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes loading {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         .memory-stats {
-            background: #f8f9fa;
-            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-top: 8px;
+            font-size: 0.75em;
+            color: #9ca3af;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: #2c2c2e;
+            border-radius: 12px;
+            border: 1px solid #4e4e50;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid #4e4e50;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.25em;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: #404040;
+            color: #fff;
+        }
+
+        .modal-body {
+            padding: 20px 24px;
+            flex: 1;
+            overflow-y: auto;
+            max-height: calc(80vh - 140px);
+        }
+
+        .modal-footer {
+            padding: 16px 24px 20px;
+            border-top: 1px solid #4e4e50;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .delete-all-btn {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 8px 16px;
             border-radius: 6px;
-            margin-top: 10px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease;
+        }
+
+        .delete-all-btn:hover {
+            background: #b91c1c;
+        }
+
+        .chat-count {
+            color: #9ca3af;
+            font-size: 0.9em;
+        }
+
+        .modal-history-item {
+            padding: 16px 24px;
+            border-bottom: 1px solid #404040;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-history-item:hover {
+            background: #404040;
+        }
+
+        .modal-history-item.active {
+            background: #10a37f;
+            border-color: #0d9488;
+        }
+
+        .modal-history-content {
+            flex: 1;
+        }
+
+        .modal-history-title {
+            font-size: 1em;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: #fff;
+        }
+
+        .modal-history-meta {
+            font-size: 0.8em;
+            opacity: 0.7;
+            color: #9ca3af;
+        }
+
+        .modal-history-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .delete-chat-btn {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .delete-chat-btn:hover {
+            background: #dc2626;
+            color: white;
+        }
+
+        .empty-history {
+            padding: 40px 24px;
+            text-align: center;
+            color: #9ca3af;
+        }
+
+        /* Analytics modal styles */
+        .analytics-section {
+            margin-bottom: 24px;
+        }
+
+        .analytics-section h3 {
+            color: #fff;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #4e4e50;
+            padding-bottom: 8px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .metric-card {
+            background: #404040;
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid #4e4e50;
+        }
+
+        .metric-label {
+            color: #9ca3af;
+            font-size: 0.9em;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            color: #fff;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .metric-unit {
+            color: #9ca3af;
+            font-size: 0.8em;
+            margin-left: 4px;
+        }
+
+        .metric-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+
+        .status-healthy {
+            background: #10a37f;
+            color: white;
+        }
+
+        .status-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .status-critical {
+            background: #dc2626;
+            color: white;
+        }
+
+        /* Knowledge Base styles */
+        .kb-search-section {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #404040;
+            border-radius: 8px;
+            border: 1px solid #4e4e50;
+        }
+
+        .kb-search-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #4e4e50;
+            border-radius: 6px;
+            background: #2c2c2e;
+            color: white;
+            font-size: 16px;
+        }
+
+        .kb-search-input:focus {
+            outline: none;
+            border-color: #10a37f;
+        }
+
+        .kb-search-input::placeholder {
+            color: #9ca3af;
+        }
+
+        .kb-search-btn {
+            padding: 12px 20px;
+            background: #10a37f;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.2s ease;
+        }
+
+        .kb-search-btn:hover {
+            background: #0d9488;
+        }
+
+        .kb-result-item {
+            background: #404040;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid #4e4e50;
+        }
+
+        .kb-result-content {
+            color: #fff;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .kb-result-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8em;
+            color: #9ca3af;
+        }
+
+        .kb-result-score {
+            color: #10a37f;
+            font-weight: 500;
+        }
+
+        /* Settings styles */
+        .settings-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .setting-item {
+            background: #404040;
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid #4e4e50;
+        }
+
+        .setting-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .setting-label input[type="checkbox"] {
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+            accent-color: #10a37f;
+        }
+
+        .setting-description {
+            font-size: 14px;
+            color: #9ca3af;
+            margin-left: 30px;
+        }
+
+        .device-item {
+            background: #404040;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid #4e4e50;
+        }
+
+        .device-name {
+            font-size: 16px;
+            font-weight: 500;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .device-details {
+            font-size: 14px;
+            color: #9ca3af;
+            margin-bottom: 8px;
+        }
+
+        .device-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
             font-size: 12px;
-            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .status-registered {
+            background: #10a37f;
+            color: white;
+        }
+
+        .status-not_registered {
+            background: #6b7280;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                padding: 0;
+            }
+            
+            .messages-container {
+                padding: 10px;
+                padding-bottom: 100px;
+            }
+            
+            .message-bubble {
+                max-width: 90%;
+            }
+            
+            .input-container {
+                padding: 15px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🧠 Brein AI</h1>
-            <p>Modular Brain-Inspired AI System</p>
+    <div class="main-layout">
+        <div class="sidebar">
+            <h3>Navigation</h3>
+            <div class="sidebar-nav">
+                <div class="sidebar-item" onclick="startNewChat()" style="background: #10a37f; color: white; margin-bottom: 15px;">
+                    ➕ New Chat
+                </div>
+                <div class="sidebar-item" onclick="openChatHistoryModal()">
+                    📝 Chat History
+                </div>
+                <div class="sidebar-item" onclick="openKnowledgeBaseModal()">
+                    📚 Knowledge Base
+                </div>
+                <div class="sidebar-item" onclick="openSettingsModal()">
+                    ⚙️ Settings
+                </div>
+                <div class="sidebar-item" onclick="openAnalyticsModal()">
+                    📊 Analytics
+                </div>
+                <div class="sidebar-item neural-network" onclick="openNeuralNetworkModal()">
+                    🌐 Neural Network
+                </div>
+            </div>
         </div>
 
         <div class="chat-container">
-            <div class="output-section">
-                <!-- Box 1: What it Says (Social Response) -->
-                <div class="output-box">
-                    <h3>💬 What it Says</h3>
-                    <div class="output-content" id="response-output">
-                        Welcome to Brein AI! Ask me anything and I'll respond based on my memory and reasoning.
-                    </div>
-                </div>
+            <div class="chat-header">
+                <h1>🧠 Brein AI</h1>
+                <p>Modular Brain-Inspired AI System</p>
+            </div>
 
-                <!-- Box 2: What it Thinks (Internal Reasoning) -->
-                <div class="output-box">
-                    <h3>🧠 What it Thinks</h3>
-                    <div class="output-content" id="thought-output">
-                        Internal reasoning and memory retrieval will appear here...
+            <div class="messages-container" id="messages-container">
+                <!-- Messages will be appended here -->
+            </div>
+
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <input
+                        type="text"
+                        id="user-input"
+                        placeholder="Message Brein AI..."
+                        autocomplete="off"
+                    />
+                    <button class="send-btn" onclick="sendQuery()" id="send-btn">
+                        Send
+                    </button>
+                    <button class="clear-btn" onclick="clearChat()">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat History Modal -->
+    <div class="modal-overlay" id="chat-history-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Chat History</h2>
+                <button class="modal-close" onclick="closeChatHistoryModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-chat-history">
+                    <!-- Chat history items will be populated here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="chat-count" id="chat-count">0 chats</div>
+                <button class="delete-all-btn" onclick="deleteAllChats()" id="delete-all-btn" style="display: none;">
+                    Delete All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Modal -->
+    <div class="modal-overlay" id="analytics-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">System Analytics</h2>
+                <button class="modal-close" onclick="closeAnalyticsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="analytics-content">
+                    <div class="analytics-section">
+                        <h3>System Performance</h3>
+                        <div id="performance-metrics" class="metrics-grid">
+                            <!-- Performance metrics will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="analytics-section">
+                        <h3>Usage Statistics (Last 7 Days)</h3>
+                        <div id="audit-summary" class="metrics-grid">
+                            <!-- Audit summary will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="analytics-section">
+                        <h3>Memory Statistics</h3>
+                        <div id="memory-stats" class="metrics-grid">
+                            <!-- Memory stats will be populated here -->
+                        </div>
                     </div>
                 </div>
             </div>
-
-            <div class="input-section">
-                <div class="input-group">
-                    <input type="text" id="user-input" placeholder="Ask Brein something..." />
-                    <button class="btn btn-primary" onclick="sendQuery()">Send</button>
-                </div>
-                <button class="btn btn-secondary" onclick="clearChat()">Clear</button>
+            <div class="modal-footer">
+                <button class="delete-all-btn" onclick="refreshAnalytics()" style="background: #10a37f;">
+                    Refresh Data
+                </button>
             </div>
+        </div>
+    </div>
 
-            <div id="status" class="status" style="display: none;">
-                Ready to chat!
+    <!-- Knowledge Base Modal -->
+    <div class="modal-overlay" id="knowledge-base-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Knowledge Base</h2>
+                <button class="modal-close" onclick="closeKnowledgeBaseModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="kb-search-section">
+                    <input type="text" id="kb-search-input" placeholder="Search knowledge base..." class="kb-search-input">
+                    <button onclick="searchKnowledgeBase()" class="kb-search-btn">Search</button>
+                </div>
+
+                <div id="kb-content">
+                    <div class="analytics-section">
+                        <h3>Memory Overview</h3>
+                        <div id="kb-memory-overview" class="metrics-grid">
+                            <!-- Memory overview will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="analytics-section">
+                        <h3>Search Results</h3>
+                        <div id="kb-search-results">
+                            <div style="text-align: center; padding: 40px; color: #9ca3af;">
+                                Enter a search query to explore the knowledge base
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="delete-all-btn" onclick="refreshKnowledgeBase()" style="background: #10a37f;">
+                    Refresh Stats
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">System Settings</h2>
+                <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="settings-content">
+                    <div class="analytics-section">
+                        <h3>Performance Monitoring</h3>
+                        <div class="settings-controls">
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <input type="checkbox" id="profiler-toggle" onchange="toggleProfiler()">
+                                    <span class="checkmark"></span>
+                                    Enable Performance Monitoring
+                                </label>
+                                <div class="setting-description">Monitor CPU, memory, and system performance in real-time</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analytics-section">
+                        <h3>Web Access</h3>
+                        <div class="settings-controls">
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <input type="checkbox" id="web-access-toggle" onchange="toggleWebAccess()">
+                                    <span class="checkmark"></span>
+                                    Allow Web Content Fetching
+                                </label>
+                                <div class="setting-description">Enable AI to fetch and learn from web content when answering queries</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analytics-section">
+                        <h3>Device Synchronization</h3>
+                        <div id="sync-devices-section">
+                            <div style="text-align: center; padding: 20px; color: #9ca3af;">Loading device information...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="delete-all-btn" onclick="saveSettings()" style="background: #10a37f;">
+                    Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Neural Network Modal -->
+    <div class="modal-overlay" id="neural-network-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Neural Network Monitor</h2>
+                <button class="modal-close" onclick="closeNeuralNetworkModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="neural-network-content">
+                    <div class="analytics-section">
+                        <h3>AI Architecture Overview</h3>
+                        <div id="ai-architecture" class="metrics-grid">
+                            <!-- AI architecture info will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="analytics-section">
+                        <h3>Agent Performance</h3>
+                        <div id="agent-performance" class="metrics-grid">
+                            <!-- Agent performance will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="analytics-section">
+                        <h3>Neural Mesh Status</h3>
+                        <div id="neural-mesh-status">
+                            <!-- Neural mesh visualization will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="delete-all-btn" onclick="refreshNeuralNetwork()" style="background: #10a37f;">
+                    Refresh Status
+                </button>
             </div>
         </div>
     </div>
 
     <script>
         const API_BASE = 'http://localhost:8000';
+        let messageHistory = [];
+        let currentSessionId = null;
+        let chatSessions = [];
+
+        // Simple markdown parser for bold text
+        function parseMarkdown(text) {
+            if (!text) return text;
+            // Convert **text** to <strong>text</strong>
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        }
+
+        // Session management functions
+        async function createNewSession() {
+            try {
+                const response = await fetch(`${API_BASE}/api/chats`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                currentSessionId = data.session_id;
+                localStorage.setItem('currentSessionId', currentSessionId);
+                return currentSessionId;
+            } catch (error) {
+                console.error('Error creating session:', error);
+                return null;
+            }
+        }
+
+        async function loadChatSessions() {
+            try {
+                const response = await fetch(`${API_BASE}/api/chats`);
+                const data = await response.json();
+                chatSessions = data.chats;
+                updateHistoryPanel();
+
+                // Update modal if it's open
+                if (document.getElementById('chat-history-modal').classList.contains('active')) {
+                    updateModalHistoryPanel();
+                }
+            } catch (error) {
+                console.error('Error loading chat sessions:', error);
+            }
+        }
+
+        async function loadChatHistory(sessionId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/chats/${sessionId}`);
+                const data = await response.json();
+
+                // Clear current messages
+                const container = document.getElementById('messages-container');
+                container.innerHTML = '';
+
+                // Load messages from history
+                for (const message of data.messages) {
+                    if (message.role === 'user') {
+                        addMessage(message.content, 'user', false, false, false);
+                    } else if (message.role === 'ai') {
+                        addMessageWithThinking(message.content, message.thought_trace || '', message.memory_stats);
+                    }
+                }
+
+                currentSessionId = sessionId;
+                localStorage.setItem('currentSessionId', sessionId);
+                updateHistoryPanel();
+            } catch (error) {
+                console.error('Error loading chat history:', error);
+            }
+        }
+
+        function updateHistoryPanel() {
+            const historyContainer = document.getElementById('chat-history');
+            if (!historyContainer) return;
+
+            historyContainer.innerHTML = '';
+
+            chatSessions.forEach(session => {
+                const sessionElement = document.createElement('div');
+                sessionElement.className = `history-item ${session.id === currentSessionId ? 'active' : ''}`;
+                sessionElement.onclick = () => loadChatHistory(session.id);
+
+                const title = document.createElement('div');
+                title.className = 'history-title';
+                title.textContent = session.title;
+
+                const meta = document.createElement('div');
+                meta.className = 'history-meta';
+                const date = new Date(session.updated_at).toLocaleDateString();
+                meta.textContent = `${date} • ${session.message_count} messages`;
+
+                sessionElement.appendChild(title);
+                sessionElement.appendChild(meta);
+                historyContainer.appendChild(sessionElement);
+            });
+        }
+
+        // Modal functions
+        function openChatHistoryModal() {
+            updateModalHistoryPanel();
+            document.getElementById('chat-history-modal').classList.add('active');
+        }
+
+        function closeChatHistoryModal() {
+            document.getElementById('chat-history-modal').classList.remove('active');
+        }
+
+        function updateModalHistoryPanel() {
+            const modalContainer = document.getElementById('modal-chat-history');
+            const chatCount = document.getElementById('chat-count');
+            const deleteAllBtn = document.getElementById('delete-all-btn');
+
+            if (!modalContainer) return;
+
+            modalContainer.innerHTML = '';
+
+            if (chatSessions.length === 0) {
+                modalContainer.innerHTML = '<div class="empty-history">No chat history yet. Start a conversation to see your chats here.</div>';
+                chatCount.textContent = '0 chats';
+                deleteAllBtn.style.display = 'none';
+                return;
+            }
+
+            chatSessions.forEach(session => {
+                const sessionElement = document.createElement('div');
+                sessionElement.className = `modal-history-item ${session.id === currentSessionId ? 'active' : ''}`;
+
+                const content = document.createElement('div');
+                content.className = 'modal-history-content';
+                content.onclick = () => {
+                    loadChatHistory(session.id);
+                    closeChatHistoryModal();
+                };
+
+                const title = document.createElement('div');
+                title.className = 'modal-history-title';
+                title.textContent = session.title;
+
+                const meta = document.createElement('div');
+                meta.className = 'modal-history-meta';
+                const date = new Date(session.updated_at).toLocaleDateString();
+                meta.textContent = `${date} • ${session.message_count} messages`;
+
+                content.appendChild(title);
+                content.appendChild(meta);
+
+                const actions = document.createElement('div');
+                actions.className = 'modal-history-actions';
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-chat-btn';
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.title = 'Delete chat';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteChat(session.id);
+                };
+
+                actions.appendChild(deleteBtn);
+
+                sessionElement.appendChild(content);
+                sessionElement.appendChild(actions);
+                modalContainer.appendChild(sessionElement);
+            });
+
+            chatCount.textContent = `${chatSessions.length} chat${chatSessions.length !== 1 ? 's' : ''}`;
+            deleteAllBtn.style.display = 'block';
+        }
+
+        async function deleteChat(sessionId) {
+            if (!confirm('Are you sure you want to delete this chat? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/chats/${sessionId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    // If we're deleting the current session, clear it
+                    if (sessionId === currentSessionId) {
+                        currentSessionId = null;
+                        localStorage.removeItem('currentSessionId');
+                        const container = document.getElementById('messages-container');
+                        container.innerHTML = '';
+                        addMessage('Hello! I\'m Brein AI. Ask me anything and I\'ll share my thoughts with you.', 'ai', false, false, true);
+                    }
+
+                    // Reload chat sessions
+                    await loadChatSessions();
+                    updateModalHistoryPanel();
+                } else {
+                    alert('Failed to delete chat. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error deleting chat:', error);
+                alert('Error deleting chat. Please try again.');
+            }
+        }
+
+        async function deleteAllChats() {
+            if (!confirm('Are you sure you want to delete ALL chats? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                // Delete all sessions
+                const deletePromises = chatSessions.map(session =>
+                    fetch(`${API_BASE}/api/chats/${session.id}`, { method: 'DELETE' })
+                );
+
+                await Promise.all(deletePromises);
+
+                // Clear current session
+                currentSessionId = null;
+                localStorage.removeItem('currentSessionId');
+                const container = document.getElementById('messages-container');
+                container.innerHTML = '';
+                addMessage('Hello! I\'m Brein AI. Ask me anything and I\'ll share my thoughts with you.', 'ai', false, false, true);
+
+                // Reload chat sessions
+                await loadChatSessions();
+                updateModalHistoryPanel();
+
+            } catch (error) {
+                console.error('Error deleting all chats:', error);
+                alert('Error deleting chats. Please try again.');
+            }
+        }
+
+        // Analytics modal functions
+        function openAnalyticsModal() {
+            document.getElementById('analytics-modal').classList.add('active');
+            loadAnalyticsData();
+        }
+
+        function closeAnalyticsModal() {
+            document.getElementById('analytics-modal').classList.remove('active');
+        }
+
+        async function loadAnalyticsData() {
+            try {
+                // Load multiple data sources in parallel
+                const [auditResponse, perfResponse, memoryResponse, healthResponse] = await Promise.all([
+                    fetch(`${API_BASE}/api/audit/summary`),
+                    fetch(`${API_BASE}/api/profiler/current`),
+                    fetch(`${API_BASE}/api/memory/stats`),
+                    fetch(`${API_BASE}/api/profiler/health`)
+                ]);
+
+                const auditData = auditResponse.ok ? await auditResponse.json() : null;
+                const perfData = perfResponse.ok ? await perfResponse.json() : null;
+                const memoryData = memoryResponse.ok ? await memoryResponse.json() : null;
+                const healthData = healthResponse.ok ? await healthResponse.json() : null;
+
+                displayAnalyticsData(auditData, perfData, memoryData, healthData);
+            } catch (error) {
+                console.error('Error loading analytics data:', error);
+                document.getElementById('analytics-content').innerHTML =
+                    '<div style="text-align: center; padding: 40px; color: #9ca3af;">Unable to load analytics data. Please try again.</div>';
+            }
+        }
+
+        function displayAnalyticsData(auditData, perfData, memoryData, healthData) {
+            // Performance metrics
+            const perfContainer = document.getElementById('performance-metrics');
+            if (perfData && !perfData.error) {
+                perfContainer.innerHTML = `
+                    <div class="metric-card">
+                        <div class="metric-label">CPU Usage</div>
+                        <div class="metric-value">${perfData.cpu_percent?.toFixed(1) || 'N/A'}<span class="metric-unit">%</span></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Memory Usage</div>
+                        <div class="metric-value">${perfData.memory_percent?.toFixed(1) || 'N/A'}<span class="metric-unit">%</span></div>
+                        <div class="metric-value" style="font-size: 0.9em; margin-top: 4px;">${(perfData.memory_mb / 1024)?.toFixed(1) || 'N/A'}<span class="metric-unit">GB</span></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Disk Usage</div>
+                        <div class="metric-value">${perfData.disk_usage?.toFixed(1) || 'N/A'}<span class="metric-unit">%</span></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Active Threads</div>
+                        <div class="metric-value">${perfData.active_threads || 'N/A'}</div>
+                    </div>
+                `;
+            } else {
+                perfContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #9ca3af; padding: 20px;">Performance monitoring not available</div>';
+            }
+
+            // Audit summary
+            const auditContainer = document.getElementById('audit-summary');
+            if (auditData) {
+                const operations = auditData.operations || {};
+                const security = auditData.security_events || {};
+
+                auditContainer.innerHTML = `
+                    <div class="metric-card">
+                        <div class="metric-label">Total Operations</div>
+                        <div class="metric-value">${auditData.total_logs || 0}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">User Queries</div>
+                        <div class="metric-value">${operations.user_query || 0}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Memory Operations</div>
+                        <div class="metric-value">${Object.keys(operations).filter(k => k.includes('memory')).reduce((sum, key) => sum + operations[key], 0)}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Security Events</div>
+                        <div class="metric-value">${Object.values(security).reduce((sum, count) => sum + count, 0)}</div>
+                    </div>
+                `;
+            } else {
+                auditContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #9ca3af; padding: 20px;">Audit data not available</div>';
+            }
+
+            // Memory statistics
+            const memoryContainer = document.getElementById('memory-stats');
+            if (memoryData) {
+                memoryContainer.innerHTML = `
+                    <div class="metric-card">
+                        <div class="metric-label">Total Memory Nodes</div>
+                        <div class="metric-value">${memoryData.total_nodes || 0}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Vector Dimension</div>
+                        <div class="metric-value">${memoryData.vector_dimension || 'N/A'}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Neural Mesh</div>
+                        <div class="metric-value">${memoryData.neural_mesh?.total_connections || 0}</div>
+                        <div style="font-size: 0.8em; margin-top: 4px; color: #9ca3af;">connections</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">System Health</div>
+                        <div class="metric-value">
+                            ${healthData?.status || 'unknown'}
+                            <span class="metric-status status-${healthData?.status || 'unknown'}">${healthData?.status || 'unknown'}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                memoryContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #9ca3af; padding: 20px;">Memory statistics not available</div>';
+            }
+        }
+
+        async function refreshAnalytics() {
+            await loadAnalyticsData();
+        }
+
+        // Knowledge Base modal functions
+        function openKnowledgeBaseModal() {
+            document.getElementById('knowledge-base-modal').classList.add('active');
+            loadKnowledgeBaseData();
+        }
+
+        function closeKnowledgeBaseModal() {
+            document.getElementById('knowledge-base-modal').classList.remove('active');
+        }
+
+        async function loadKnowledgeBaseData() {
+            try {
+                const response = await fetch(`${API_BASE}/api/memory/stats`);
+                const memoryData = response.ok ? await response.json() : null;
+
+                displayKnowledgeBaseOverview(memoryData);
+            } catch (error) {
+                console.error('Error loading knowledge base data:', error);
+            }
+        }
+
+        function displayKnowledgeBaseOverview(memoryData) {
+            const overviewContainer = document.getElementById('kb-memory-overview');
+
+            if (memoryData) {
+                const typeDist = memoryData.type_distribution || {};
+                const memoryTypeDist = memoryData.memory_type_distribution || {};
+
+                overviewContainer.innerHTML = `
+                    <div class="metric-card">
+                        <div class="metric-label">Total Knowledge Nodes</div>
+                        <div class="metric-value">${memoryData.total_nodes || 0}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Conversational Memory</div>
+                        <div class="metric-value">${typeDist.conversational || 0}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Working Memory</div>
+                        <div class="metric-value">${memoryTypeDist.working || 0}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Long-term Memory</div>
+                        <div class="metric-value">${memoryTypeDist.long_term || 0}</div>
+                    </div>
+                `;
+            } else {
+                overviewContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #9ca3af; padding: 20px;">Memory statistics not available</div>';
+            }
+        }
+
+        async function searchKnowledgeBase() {
+            const searchInput = document.getElementById('kb-search-input');
+            const query = searchInput.value.trim();
+
+            if (!query) {
+                alert('Please enter a search query');
+                return;
+            }
+
+            const resultsContainer = document.getElementById('kb-search-results');
+            resultsContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #9ca3af;">Searching...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/memory/search?query=${encodeURIComponent(query)}&top_k=10`);
+                const data = response.ok ? await response.json() : { results: [] };
+
+                displaySearchResults(data.results || []);
+            } catch (error) {
+                console.error('Error searching knowledge base:', error);
+                resultsContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #dc2626;">Error searching knowledge base</div>';
+            }
+        }
+
+        function displaySearchResults(results) {
+            const resultsContainer = document.getElementById('kb-search-results');
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #9ca3af;">No results found for your search query</div>';
+                return;
+            }
+
+            resultsContainer.innerHTML = '';
+
+            results.forEach(result => {
+                const resultElement = document.createElement('div');
+                resultElement.className = 'kb-result-item';
+
+                const content = result.content || '';
+                const truncatedContent = content.length > 200 ? content.substring(0, 200) + '...' : content;
+
+                resultElement.innerHTML = `
+                    <div class="kb-result-content">${truncatedContent}</div>
+                    <div class="kb-result-meta">
+                        <span>Type: ${result.type || 'unknown'}</span>
+                        <span class="kb-result-score">Score: ${(result.score * 100).toFixed(1)}%</span>
+                    </div>
+                `;
+
+                resultsContainer.appendChild(resultElement);
+            });
+        }
+
+        async function refreshKnowledgeBase() {
+            await loadKnowledgeBaseData();
+        }
+
+        // Allow Enter key in knowledge base search
+        document.getElementById('kb-search-input')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchKnowledgeBase();
+            }
+        });
+
+        // Settings modal functions
+        function openSettingsModal() {
+            document.getElementById('settings-modal').classList.add('active');
+            loadSettingsData();
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').classList.remove('active');
+        }
+
+        async function loadSettingsData() {
+            try {
+                // Load device information
+                const devicesResponse = await fetch(`${API_BASE}/api/sync/devices`);
+                const devicesData = devicesResponse.ok ? await devicesResponse.json() : { devices: [] };
+
+                // Check profiler status (this is a simplified check - in reality we'd need a status endpoint)
+                const profilerToggle = document.getElementById('profiler-toggle');
+                const webAccessToggle = document.getElementById('web-access-toggle');
+
+                // For now, set defaults (in a real implementation, these would be loaded from backend)
+                profilerToggle.checked = false; // Assume profiler is off by default
+                webAccessToggle.checked = false; // Assume web access is off by default
+
+                displayDeviceList(devicesData.devices || []);
+            } catch (error) {
+                console.error('Error loading settings data:', error);
+                document.getElementById('sync-devices-section').innerHTML =
+                    '<div style="text-align: center; color: #dc2626; padding: 20px;">Unable to load device information</div>';
+            }
+        }
+
+        function displayDeviceList(devices) {
+            const devicesSection = document.getElementById('sync-devices-section');
+
+            if (devices.length === 0) {
+                devicesSection.innerHTML = '<div style="text-align: center; padding: 40px; color: #9ca3af;">No devices registered for synchronization</div>';
+                return;
+            }
+
+            devicesSection.innerHTML = '';
+
+            devices.forEach(device => {
+                const deviceElement = document.createElement('div');
+                deviceElement.className = 'device-item';
+
+                const lastSeen = new Date(device.last_seen).toLocaleString();
+
+                deviceElement.innerHTML = `
+                    <div class="device-name">${device.device_name}</div>
+                    <div class="device-details">
+                        Type: ${device.device_type} | Last seen: ${lastSeen}<br>
+                        Capabilities: ${device.capabilities.join(', ') || 'None'}
+                    </div>
+                    <div class="device-status status-registered">Registered</div>
+                `;
+
+                devicesSection.appendChild(deviceElement);
+            });
+        }
+
+        async function toggleProfiler() {
+            const toggle = document.getElementById('profiler-toggle');
+            const isEnabled = toggle.checked;
+
+            try {
+                const endpoint = isEnabled ? '/api/profiler/start' : '/api/profiler/stop';
+                const response = await fetch(`${API_BASE}${endpoint}`, { method: 'POST' });
+
+                if (response.ok) {
+                    console.log(`Performance monitoring ${isEnabled ? 'started' : 'stopped'}`);
+                } else {
+                    console.error('Failed to toggle profiler');
+                    toggle.checked = !isEnabled; // Revert on failure
+                }
+            } catch (error) {
+                console.error('Error toggling profiler:', error);
+                toggle.checked = !isEnabled; // Revert on failure
+            }
+        }
+
+        function toggleWebAccess() {
+            const toggle = document.getElementById('web-access-toggle');
+            const isEnabled = toggle.checked;
+
+            // Store preference locally (in a real implementation, this would be saved to backend)
+            localStorage.setItem('webAccessEnabled', isEnabled);
+
+            console.log(`Web access ${isEnabled ? 'enabled' : 'disabled'}`);
+        }
+
+        async function saveSettings() {
+            // In a real implementation, this would save settings to backend
+            alert('Settings saved successfully!');
+            closeSettingsModal();
+        }
+
+        // Neural Network modal functions
+        function openNeuralNetworkModal() {
+            document.getElementById('neural-network-modal').classList.add('active');
+            loadNeuralNetworkData();
+        }
+
+        function closeNeuralNetworkModal() {
+            document.getElementById('neural-network-modal').classList.remove('active');
+        }
+
+        async function loadNeuralNetworkData() {
+            try {
+                const memoryResponse = await fetch(`${API_BASE}/api/memory/stats`);
+                const memoryData = memoryResponse.ok ? await memoryResponse.json() : null;
+
+                displayNeuralNetworkData(memoryData);
+            } catch (error) {
+                console.error('Error loading neural network data:', error);
+                document.getElementById('neural-network-content').innerHTML =
+                    '<div style="text-align: center; padding: 40px; color: #9ca3af;">Unable to load neural network information</div>';
+            }
+        }
+
+        function displayNeuralNetworkData(memoryData) {
+            // AI Architecture
+            const architectureContainer = document.getElementById('ai-architecture');
+            if (memoryData) {
+                architectureContainer.innerHTML = `
+                    <div class="metric-card">
+                        <div class="metric-label">Memory Nodes</div>
+                        <div class="metric-value">${memoryData.total_nodes || 0}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Vector Dimensions</div>
+                        <div class="metric-value">${memoryData.vector_dimension || 'N/A'}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Embedding Model</div>
+                        <div class="metric-value" style="font-size: 0.9em;">${memoryData.embedding_model || 'Unknown'}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Index Size</div>
+                        <div class="metric-value">${memoryData.index_size || 0}</div>
+                    </div>
+                `;
+            } else {
+                architectureContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #9ca3af; padding: 20px;">Architecture data not available</div>';
+            }
+
+            // Agent Performance (simplified - in reality this would come from backend)
+            const agentContainer = document.getElementById('agent-performance');
+            agentContainer.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-label">Hippocampus Agent</div>
+                    <div class="metric-value">Active</div>
+                    <div style="font-size: 0.8em; margin-top: 4px; color: #9ca3af;">Memory management</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Prefrontal Cortex</div>
+                    <div class="metric-value">Active</div>
+                    <div style="font-size: 0.8em; margin-top: 4px; color: #9ca3af;">Complex reasoning</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Amygdala Agent</div>
+                    <div class="metric-value">Active</div>
+                    <div style="font-size: 0.8em; margin-top: 4px; color: #9ca3af;">Emotional processing</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Thalamus Router</div>
+                    <div class="metric-value">Active</div>
+                    <div style="font-size: 0.8em; margin-top: 4px; color: #9ca3af;">Query routing</div>
+                </div>
+            `;
+
+            // Neural Mesh Status
+            const meshContainer = document.getElementById('neural-mesh-status');
+            if (memoryData && memoryData.neural_mesh) {
+                const mesh = memoryData.neural_mesh;
+                meshContainer.innerHTML = `
+                    <div style="background: #404040; border-radius: 8px; padding: 20px; border: 1px solid #4e4e50;">
+                        <h4 style="color: #fff; margin-bottom: 16px;">Neural Mesh Connections</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+                            <div class="metric-card">
+                                <div class="metric-label">Total Connections</div>
+                                <div class="metric-value">${mesh.total_connections || 0}</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Active Nodes</div>
+                                <div class="metric-value">${mesh.active_nodes || 0}</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Reinforcement Events</div>
+                                <div class="metric-value">${mesh.reinforcement_count || 0}</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Mesh Density</div>
+                                <div class="metric-value">${mesh.density ? (mesh.density * 100).toFixed(1) + '%' : 'N/A'}</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 16px; font-size: 0.9em; color: #9ca3af;">
+                            The neural mesh creates associative connections between related concepts, enabling the AI to make intelligent connections and learn from context.
+                        </div>
+                        <div id="neural-network-graph" style="height: 300px; margin-top: 20px; border-radius: 8px; border: 1px solid #4e4e50;"></div>
+                    </div>
+                `;
+
+                // Initialize neural network visualization
+                setTimeout(() => {
+                    initializeNeuralNetworkGraph(mesh);
+                }, 100);
+            } else {
+                meshContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #9ca3af; background: #404040; border-radius: 8px; border: 1px solid #4e4e50;">Neural mesh information not available</div>';
+            }
+        }
+
+        async function refreshNeuralNetwork() {
+            await loadNeuralNetworkData();
+        }
+
+        async function startNewChat() {
+            // Clear current messages
+            const container = document.getElementById('messages-container');
+            container.innerHTML = '';
+
+            // Clear current session (don't create new one yet)
+            currentSessionId = null;
+            localStorage.removeItem('currentSessionId');
+
+            // Add welcome message
+            addMessage('Hello! I\'m Brein AI. Ask me anything and I\'ll share my thoughts with you.', 'ai', false, false, true);
+
+            // Update history panel to show no active session
+            updateHistoryPanel();
+        }
 
         async function sendQuery() {
             const input = document.getElementById('user-input');
+            const sendBtn = document.getElementById('send-btn');
             const query = input.value.trim();
 
             if (!query) return;
 
-            // Show loading state
-            showStatus('Thinking...', true);
+            // Remove welcome message if it exists
+            const welcomeMessage = document.querySelector('.welcome-message');
+            if (welcomeMessage) {
+                welcomeMessage.remove();
+            }
+
+            // Clean up any stray thinking messages first
+            const container = document.getElementById('messages-container');
+            const thinkingOnlyMessages = container.querySelectorAll('.message.ai .message-bubble');
+            thinkingOnlyMessages.forEach(bubble => {
+                const mainContent = bubble.querySelector('.main-content');
+                // Remove AI messages that have no actual response content
+                if (mainContent && mainContent.textContent.trim() === '') {
+                    bubble.parentElement.remove();
+                }
+            });
+
+            // Add user message FIRST
+            addMessage(query, 'user');
+            input.value = '';
+
+            // Disable input and show loading
             input.disabled = true;
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<span class="loading-dots"></span><span class="loading-dots"></span><span class="loading-dots"></span>';
 
             try {
+                // Ensure we have a session
+                if (!currentSessionId) {
+                    await createNewSession();
+                }
+
                 const response = await fetch(`${API_BASE}/api/query`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ query: query })
+                    body: JSON.stringify({
+                        query: query,
+                        session_id: currentSessionId
+                    })
                 });
 
                 const data = await response.json();
 
-                // Update outputs
-                document.getElementById('response-output').textContent = data.response || 'No response generated';
-
-                // Show thought trace in Box #2
-                const thoughtText = data.thought_trace || 'No internal reasoning available.';
-                document.getElementById('thought-output').textContent = thoughtText;
-
-                // Show confidence and metadata if available
-                if (data.confidence !== undefined) {
-                    const confidencePercent = (data.confidence * 100).toFixed(1);
-                    document.getElementById('thought-output').textContent +=
-                        `\n\nConfidence: ${confidencePercent}% | Activated nodes: ${data.reasoning_metadata?.activated_nodes || 0}`;
-                }
-
-                // Show memory stats
-                if (data.memory_stats) {
-                    showMemoryStats(data.memory_stats);
-                }
-
-                // Clear input
-                input.value = '';
+                // Add AI response with thinking content
+                // Fix: Show actual AI response in main content, metadata in thinking section
+                addMessageWithThinking(data.response || 'No response generated', data.thought_trace || '', data.memory_stats);
 
             } catch (error) {
                 console.error('Error:', error);
-                showStatus('Error: Could not connect to Brein AI server', false);
+                addMessage('Error: Could not connect to Brein AI server', 'ai', false, false);
             } finally {
                 input.disabled = false;
-                setTimeout(() => hideStatus(), 3000);
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+                scrollToBottom();
             }
         }
 
-        function showStatus(message, isLoading = false) {
-            const status = document.getElementById('status');
-            status.textContent = isLoading ? message + ' ' : message;
-            if (isLoading) {
-                status.innerHTML += '<span class="loading"></span>';
+        function addMessage(content, sender, isTemporary = false, showThinking = false, isWelcome = false) {
+            const container = document.getElementById('messages-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            if (isWelcome) {
+                messageDiv.classList.add('welcome-message');
             }
-            status.style.display = 'block';
+            messageDiv.dataset.messageId = messageHistory.length;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+
+            if (sender === 'ai' && !isTemporary && showThinking) {
+                bubble.innerHTML = `
+                    <div class="main-content">${content}</div>
+                    <div class="thinking-indicator" onclick="toggleThinking(this)">
+                        <span class="thinking-text">VIEW THOUGHT PROCESS</span>
+                        <span class="thinking-arrow">▼</span>
+                    </div>
+                    <div class="thinking-content collapsed">
+                    </div>
+                `;
+            } else {
+                bubble.textContent = content;
+            }
+
+            messageDiv.appendChild(bubble);
+            container.appendChild(messageDiv);
+
+            scrollToBottom();
+            return messageHistory.length;
         }
 
-        function hideStatus() {
-            document.getElementById('status').style.display = 'none';
-        }
-
-        function showMemoryStats(stats) {
-            const statsDiv = document.createElement('div');
-            statsDiv.className = 'memory-stats';
-            statsDiv.innerHTML = `
-                <strong>Memory Stats:</strong>
-                ${stats.total_nodes} nodes,
-                ${stats.vector_dimension}D embeddings,
-                Model: ${stats.embedding_model}
+        function addMessageWithThinking(response, thinking, memoryStats) {
+            const container = document.getElementById('messages-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ai';
+            messageDiv.dataset.messageId = messageHistory.length;
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            
+            // Parse markdown in response
+            const parsedResponse = parseMarkdown(response);
+            
+            let thinkingHTML = '';
+            if (thinking && thinking.trim() !== '' && thinking !== 'No internal reasoning available') {
+                thinkingHTML = `
+                    <div class="thinking-indicator" onclick="toggleThinking(this)">
+                        <span class="thinking-text">VIEW THOUGHT PROCESS</span>
+                        <span class="thinking-arrow">▼</span>
+                    </div>
+                    <div class="thinking-content collapsed">
+                        ${thinking}
+                        ${memoryStats ? `<div class="memory-stats">Memory: ${memoryStats.total_nodes} nodes</div>` : ''}
+                    </div>
+                `;
+            }
+            
+            bubble.innerHTML = `
+                <div class="main-content">${parsedResponse}</div>
+                ${thinkingHTML}
             `;
-
-            const container = document.querySelector('.input-section');
-            const existing = container.querySelector('.memory-stats');
-            if (existing) existing.remove();
-            container.appendChild(statsDiv);
+            
+            messageDiv.appendChild(bubble);
+            container.appendChild(messageDiv);
+            
+            scrollToBottom();
+            return messageHistory.length;
         }
 
-        function clearChat() {
-            document.getElementById('response-output').textContent = 'Chat cleared. Ready for new conversation!';
-            document.getElementById('thought-output').textContent = 'Internal reasoning will appear here...';
-            document.getElementById('user-input').value = '';
-            const stats = document.querySelector('.memory-stats');
-            if (stats) stats.remove();
+        function updateAIMessage(messageIndex, data) {
+            const messages = document.querySelectorAll('.message.ai');
+            const messageElement = messages[messageIndex];
+            
+            if (!messageElement) return;
+            
+            const bubble = messageElement.querySelector('.message-bubble');
+            bubble.innerHTML = `
+                <div class="main-content">${data.response}</div>
+                <div class="thinking-indicator" onclick="toggleThinking(this)">
+                    <span class="thinking-text">VIEW THOUGHT PROCESS</span>
+                    <span class="thinking-arrow">▼</span>
+                </div>
+                <div class="thinking-content collapsed">
+                    ${data.thought_trace}
+                    ${data.memory_stats ? `<div class="memory-stats">Memory: ${data.memory_stats.total_nodes} nodes</div>` : ''}
+                </div>
+            `;
+            
+            scrollToBottom();
+        }
+
+        function toggleThinking(element) {
+            const content = element.parentElement.querySelector('.thinking-content');
+            const arrow = element.querySelector('.thinking-arrow');
+
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                arrow.textContent = '▲';
+                element.querySelector('.thinking-text').textContent = 'HIDE THOUGHT PROCESS';
+            } else {
+                content.classList.add('collapsed');
+                arrow.textContent = '▼';
+                element.querySelector('.thinking-text').textContent = 'VIEW THOUGHT PROCESS';
+            }
+        }
+
+        async function clearChat() {
+            if (!currentSessionId) {
+                // If no session, just clear messages and show welcome
+                const container = document.getElementById('messages-container');
+                container.innerHTML = '';
+                messageHistory = [];
+                addMessage('Hello! I\'m Brein AI. Ask me anything and I\'ll share my thoughts with you.', 'ai', false, false, true);
+                return;
+            }
+
+            // Delete the current session from backend
+            try {
+                await fetch(`${API_BASE}/api/chats/${currentSessionId}`, {
+                    method: 'DELETE'
+                });
+            } catch (error) {
+                console.error('Error deleting session:', error);
+            }
+
+            // Clear current session and messages
+            currentSessionId = null;
+            localStorage.removeItem('currentSessionId');
+            const container = document.getElementById('messages-container');
+            container.innerHTML = '';
+            messageHistory = [];
+
+            // Show welcome message without creating a session
+            addMessage('Hello! I\'m Brein AI. Ask me anything and I\'ll share my thoughts with you.', 'ai', false, false, true);
+
+            // Update history panel
+            await loadChatSessions();
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('messages-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function selectSidebarItem(element) {
+            // Remove active class from all items except history items
+            const sidebarItems = document.querySelectorAll('.sidebar-item:not(.history-item)');
+            sidebarItems.forEach(item => item.classList.remove('active'));
+
+            // Add active class to clicked item
+            element.classList.add('active');
         }
 
         // Allow Enter key to send
@@ -317,16 +1925,147 @@
             }
         });
 
-        // Check server health on load
+        // Close modal when clicking outside
+        document.getElementById('chat-history-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeChatHistoryModal();
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('chat-history-modal').classList.contains('active')) {
+                closeChatHistoryModal();
+            }
+        });
+
+        // Neural network visualization function
+        function initializeNeuralNetworkGraph(mesh) {
+            const container = document.getElementById('neural-network-graph');
+            if (!container) return;
+
+            // Create sample nodes and edges for visualization
+            const nodes = [];
+            const edges = [];
+
+            // Create nodes based on mesh data
+            const nodeCount = Math.min(mesh.active_nodes || 10, 20); // Limit to 20 nodes for visualization
+
+            for (let i = 0; i < nodeCount; i++) {
+                nodes.push({
+                    id: i,
+                    label: `Node ${i + 1}`,
+                    shape: 'circle',
+                    size: 20 + Math.random() * 10,
+                    color: {
+                        background: '#10a37f',
+                        border: '#0d9488'
+                    },
+                    font: {
+                        color: '#fff',
+                        size: 12
+                    }
+                });
+            }
+
+            // Create edges based on connections
+            const edgeCount = Math.min(mesh.total_connections || 15, 30); // Limit edges for performance
+            for (let i = 0; i < edgeCount; i++) {
+                const from = Math.floor(Math.random() * nodeCount);
+                let to = Math.floor(Math.random() * nodeCount);
+                while (to === from) {
+                    to = Math.floor(Math.random() * nodeCount);
+                }
+
+                edges.push({
+                    from: from,
+                    to: to,
+                    color: {
+                        color: '#4e4e50',
+                        highlight: '#10a37f'
+                    },
+                    width: 1 + Math.random() * 2,
+                    arrows: {
+                        to: { enabled: false },
+                        from: { enabled: false }
+                    }
+                });
+            }
+
+            const data = {
+                nodes: new vis.DataSet(nodes),
+                edges: new vis.DataSet(edges)
+            };
+
+            const options = {
+                nodes: {
+                    borderWidth: 2,
+                    borderWidthSelected: 3
+                },
+                edges: {
+                    smooth: {
+                        enabled: true,
+                        type: 'continuous'
+                    }
+                },
+                physics: {
+                    enabled: true,
+                    barnesHut: {
+                        gravitationalConstant: -2000,
+                        centralGravity: 0.3,
+                        springLength: 95,
+                        springConstant: 0.04,
+                        damping: 0.09,
+                        avoidOverlap: 0.1
+                    },
+                    stabilization: {
+                        enabled: true,
+                        iterations: 100
+                    }
+                },
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true,
+                    hover: true
+                }
+            };
+
+            const network = new vis.Network(container, data, options);
+
+            // Add some interactivity
+            network.on('click', function(params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    console.log('Clicked node:', nodeId);
+                }
+            });
+        }
+
+        // Check server health and load last session on load
         window.addEventListener('load', async () => {
             try {
                 const response = await fetch(`${API_BASE}/api/health`);
                 if (response.ok) {
-                    showStatus('Connected to Brein AI server', false);
-                    setTimeout(() => hideStatus(), 2000);
+                    console.log('Connected to Brein AI server');
+
+                    // Load chat sessions for history panel
+                    await loadChatSessions();
+
+                    // Check for saved session
+                    const savedSessionId = localStorage.getItem('currentSessionId');
+                    if (savedSessionId && chatSessions.some(s => s.id === savedSessionId)) {
+                        // Load the last active session
+                        await loadChatHistory(savedSessionId);
+                    } else {
+                        // Just show welcome message without creating a session
+                        addMessage('Hello! I\'m Brein AI. Ask me anything and I\'ll share my thoughts with you.', 'ai', false, false, true);
+                    }
                 }
             } catch (error) {
-                showStatus('Warning: Could not connect to Brein AI server', false);
+                console.log('Warning: Could not connect to Brein AI server');
+                // Add welcome message even if server is down
+                addMessage('Hello! I\'m Brein AI. Ask me anything and I\'ll share my thoughts with you.', 'ai', false, false, true);
             }
         });
     </script>

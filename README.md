@@ -275,7 +275,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Documentation**: [Brein AI Docs](https://github.com/AbduljabbarBXR/Brein-Ai/wiki)
+- **Documentation**: [Brein AI Docs](https://github.com/AbduljabbarBXR/Brein-Ai)
 - **Discussions**: [Email](abdijabar2009@gmail.com)
 
 ---

@@ -1,12 +1,17 @@
 from fastapi import HTTPException
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from memory_manager import MemoryManager
 from memory_transformer import MemoryTransformer
-from agents import HippocampusAgent, CortexAgent, BasalGangliaAgent
+from chat_manager import ChatManager
+from agents import (
+    GGUFModelLoader, HippocampusAgent, PrefrontalCortexAgent, AmygdalaAgent, ThalamusRouter
+)
+from memory_transformer import MemoryTransformer
+from neural_mesh import NeuralMesh
 from neural_mesh import NeuralMesh
 import logging
 
@@ -15,24 +20,35 @@ logger = logging.getLogger(__name__)
 class Orchestrator:
     """
     Orchestrator for Brein AI - coordinates between memory, agents, and user queries.
-    Now uses multi-agent architecture with specialized agents.
+    Now uses multi-model brain-inspired architecture with specialized agents.
     """
 
-    def __init__(self, memory_manager: MemoryManager):
+    def __init__(self, memory_manager: MemoryManager, chat_manager: ChatManager):
         self.memory = memory_manager
+        self.chat_manager = chat_manager
         self.memory_transformer = MemoryTransformer()
         self.neural_mesh = NeuralMesh()
 
-        # Initialize agents
-        self.hippocampus = HippocampusAgent(memory_manager)
-        self.cortex = CortexAgent(memory_manager, self.memory_transformer)
-        self.basal_ganglia = BasalGangliaAgent(memory_manager, self.neural_mesh)
+        # Initialize GGUF model loader
+        self.model_loader = GGUFModelLoader()
 
-        self.session_context = {}  # Enhanced session storage
+        # Initialize agents with model integration
+        self.hippocampus = HippocampusAgent(memory_manager, self.model_loader)
+        self.memory_transformer = MemoryTransformer()
+        self.neural_mesh = NeuralMesh()
+        self.prefrontal_cortex = PrefrontalCortexAgent(memory_manager, self.model_loader)
+        self.amygdala = AmygdalaAgent(self.model_loader)
+        self.thalamus_router = ThalamusRouter(self.model_loader)
+
+        # Legacy agents for compatibility
+        self.cortex = None  # Will be handled by routing
+        self.basal_ganglia = None  # Will be handled by routing
+
+        self.session_context = {}  # Keep for backward compatibility, but prefer chat_manager
 
     async def process_query(self, query: str, session_id: Optional[str] = None, enable_web_access: bool = False) -> Dict:
         """
-        Process a user query using multi-agent architecture with optional web access.
+        Process a user query using multi-model brain-inspired architecture with intelligent routing.
 
         Args:
             query: User query string
@@ -46,32 +62,140 @@ class Orchestrator:
             # Get session context for continuity
             session_history = self.get_session_context(session_id) if session_id else None
 
-            # Use Cortex Agent for reasoning and response generation
-            cortex_result = await self.cortex.process_query(query, session_history)
+            # Enhanced memory search with top-N and mesh expansion
+            memory_results = self.memory.search_memory(query, top_k=10, use_mesh_expansion=True)
+            memory_chunks = []
+            relevant_memory_chunks = []
+
+            for result in memory_results:
+                chunk = {
+                    "content": result["content"],
+                    "score": result["score"],
+                    "type": result["type"],
+                    "node_id": result["node_id"]
+                }
+                memory_chunks.append(chunk)
+
+                # Filter for highly relevant chunks (score > 0.6) to avoid spurious matches
+                if result["score"] > 0.6:
+                    relevant_memory_chunks.append(chunk)
+
+            # Use Thalamus Router for intelligent model selection
+            routing_decision = self.thalamus_router.route_query(query, relevant_memory_chunks)
+
+            # Route to appropriate agent based on complexity
+            if routing_decision["agent"] == "prefrontal_cortex":
+                # Complex reasoning with Phi-3.1
+                agent_result = await self.prefrontal_cortex.process_complex_query(query, relevant_memory_chunks, session_history)
+                thought_trace = f"""Complex reasoning activated.
+
+Analysis: {agent_result.get('analysis', '')}
+
+Step-by-step reasoning: {agent_result.get('reasoning_steps', '')}
+
+Decision making: Query routed to prefrontal cortex due to complexity score of {routing_decision.get('complexity_score', 0):.2f}. Using Phi-3.1 model for advanced reasoning capabilities."""
+
+            elif routing_decision["agent"] == "amygdala":
+                # Emotional/personality response with TinyLlama
+                emotional_context = self._analyze_emotional_context(query, session_history)
+                memory_insights = [chunk["content"][:100] for chunk in relevant_memory_chunks[:3]]
+                agent_result = await self.amygdala.generate_personality_response(query, emotional_context, memory_insights)
+                thought_trace = f"""Emotional processing activated.
+
+Emotional context analysis: Detected tone '{emotional_context.get('tone', 'neutral')}' with urgency level '{emotional_context.get('urgency', 'normal')}'.
+
+Memory insights considered: {', '.join(memory_insights) if memory_insights else 'No relevant memories found'}
+
+Personality response strategy: Using TinyLlama model to generate empathetic, conversational response with emotional tone '{agent_result.get('emotional_tone', 'neutral')}'."""
+
+            else:
+                # Standard processing - use Llama-3.2 via Hippocampus for general queries
+                # Generate internal thought process first
+                thought_prompt = f"Think step by step about how to answer: {query}\n\nList the key points to cover in plain text:"
+                internal_thought = self.model_loader.generate("llama-3.2", thought_prompt, max_tokens=256, temperature=0.5)
+
+                # Create response using memory context
+                prompt = f"Provide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose."
+                if relevant_memory_chunks:
+                    context = "\n".join([f"Memory: {chunk['content'][:200]}" for chunk in relevant_memory_chunks[:2]])
+                    prompt = f"Using this context:\n{context}\n\nProvide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose."
+
+                response_text = self.model_loader.generate("llama-3.2", prompt, max_tokens=512, temperature=0.6)
+                agent_result = {
+                    "response": response_text,
+                    "confidence": 0.8,
+                    "model_used": "llama-3.2"
+                }
+
+                memory_context_info = ""
+                if relevant_memory_chunks:
+                    memory_context_info = f"\n\nMemory context retrieved: {len(relevant_memory_chunks)} relevant chunks found with scores ranging from {min([c['score'] for c in relevant_memory_chunks]):.2f} to {max([c['score'] for c in relevant_memory_chunks]):.2f}"
+
+                # Clean up markdown formatting from internal thought
+                cleaned_thought = internal_thought.strip().replace('**', '').replace('*', '')
+
+                thought_trace = f"""Internal reasoning: {cleaned_thought}
+
+Query routing: Complexity score {routing_decision.get('complexity_score', 0):.2f} determined standard processing appropriate.{memory_context_info}
+
+Response generation: Created helpful response using memory-augmented context and step-by-step reasoning."""
 
             # Extract memory node IDs for reinforcement
-            memory_node_ids = [chunk["node_id"] for chunk in cortex_result.get("memory_chunks", [])]
+            memory_node_ids = [chunk["node_id"] for chunk in memory_chunks]
 
-            # Apply reinforcement learning via Basal Ganglia
+            # Apply reinforcement learning via Basal Ganglia (simplified for now)
             if memory_node_ids:
-                await self.basal_ganglia.reinforce_memory(memory_node_ids, cortex_result.get("confidence", 0.5))
+                confidence = agent_result.get("confidence", 0.5)
+                # TODO: Implement reinforcement learning
 
-            # Get policy decisions
-            policy_decision = self.basal_ganglia.get_policy_decision("query", cortex_result.get("memory_chunks", []))
+            # Get policy decisions (simplified)
+            policy_decision = {
+                "use_mesh_expansion": len(memory_chunks) > 0,
+                "prioritize_recent": False,
+                "agent": "thalamus_router"
+            }
 
-            # Store conversation in session context
+            # Store conversation in persistent storage
             if session_id:
-                self._store_conversation(session_id, query, cortex_result["response"], cortex_result.get("memory_chunks", []))
+                # Check if this is the first message in the session
+                session_info = self.chat_manager.get_session_info(session_id)
+                is_first_message = session_info and session_info["message_count"] == 0
+
+                # Generate smart title for new sessions
+                if is_first_message:
+                    smart_title = self.chat_manager.generate_smart_title(query)
+                    self.chat_manager.update_chat_title(session_id, smart_title)
+
+                # Store the messages
+                self.chat_manager.add_message(
+                    session_id=session_id,
+                    role="user",
+                    content=query
+                )
+
+                self.chat_manager.add_message(
+                    session_id=session_id,
+                    role="ai",
+                    content=agent_result["response"],
+                    thought_trace=thought_trace,
+                    memory_stats=result.get("memory_stats")
+                )
 
             return {
-                "response": cortex_result["response"],
-                "thought_trace": cortex_result["thought_trace"],
-                "confidence": cortex_result["confidence"],
-                "memory_chunks": cortex_result["memory_chunks"],
+                "response": agent_result["response"],
+                "thought_trace": thought_trace,
+                "confidence": agent_result.get("confidence", 0.5),
+                "memory_chunks": relevant_memory_chunks,  # Only return relevant chunks
                 "session_id": session_id or "default",
                 "memory_stats": self.memory.get_memory_stats(),
-                "reasoning_metadata": cortex_result["reasoning_metadata"],
-                "agents_used": ["cortex", "basal_ganglia"],
+                "reasoning_metadata": {
+                    "routing_decision": routing_decision,
+                    "model_used": agent_result.get("model_used", "unknown"),
+                    "agent_used": routing_decision["agent"],
+                    "total_memory_chunks": len(memory_chunks),
+                    "relevant_memory_chunks": len(relevant_memory_chunks)
+                },
+                "agents_used": [routing_decision["agent"], "basal_ganglia", "thalamus_router"],
                 "policy_decision": policy_decision,
                 "web_access_enabled": enable_web_access
             }
@@ -101,32 +225,42 @@ class Orchestrator:
 
         return f"Based on my memory and feeling {confidence_text} about this: {top_chunk['content'][:200]}...{thought_insight}"
 
-    def _store_conversation(self, session_id: str, query: str, response: str, memory_chunks: List[Dict]):
+    def _analyze_emotional_context(self, query: str, session_history: Optional[List[Dict]] = None) -> Dict[str, Any]:
         """
-        Store conversation data for session tracking with enhanced context.
+        Analyze emotional context from query and conversation history.
         """
-        memory_node_ids = [chunk["node_id"] for chunk in memory_chunks]
+        emotional_indicators = {
+            'positive': ['good', 'great', 'excellent', 'amazing', 'wonderful', 'happy', 'excited', 'love'],
+            'negative': ['bad', 'terrible', 'awful', 'hate', 'angry', 'frustrated', 'sad', 'worried'],
+            'urgent': ['urgent', 'emergency', 'immediately', 'asap', 'quickly', 'help'],
+            'questioning': ['why', 'how', 'what', 'confused', 'unsure']
+        }
 
-        # Enhanced session storage with agent metadata
-        if session_id not in self.session_context:
-            self.session_context[session_id] = []
+        query_lower = query.lower()
+        tone_scores = {tone: sum(1 for word in words if word in query_lower)
+                      for tone, words in emotional_indicators.items()}
 
-        self.session_context[session_id].append({
-            "query": query,
-            "response": response,
-            "memory_nodes": memory_node_ids,
-            "memory_count": len(memory_chunks),
-            "timestamp": "now",  # Would use proper datetime in production
-            "agents_used": ["cortex", "basal_ganglia"]  # Track which agents processed this
-        })
+        # Determine primary tone
+        max_tone = max(tone_scores, key=tone_scores.get)
+        primary_tone = max_tone if tone_scores[max_tone] > 0 else 'neutral'
 
-        # Keep only last 10 exchanges per session
-        if len(self.session_context[session_id]) > 10:
-            self.session_context[session_id] = self.session_context[session_id][-10:]
+        # Consider session history for context
+        urgency = 'normal'
+        if session_history and len(session_history) > 0:
+            recent_queries = [conv.get('query', '').lower() for conv in session_history[-3:]]
+            urgent_words = sum(1 for q in recent_queries for word in emotional_indicators['urgent'] if word in q)
+            if urgent_words > 0:
+                urgency = 'high'
+
+        return {
+            'tone': primary_tone,
+            'urgency': urgency,
+            'scores': tone_scores
+        }
 
     async def ingest_content(self, content: str, content_type: str = "stable") -> Dict:
         """
-        Ingest new content into memory using Hippocampus Agent.
+        Ingest new content into memory using Hippocampus Agent with AI-powered processing.
 
         Args:
             content: Content to ingest
@@ -136,7 +270,7 @@ class Orchestrator:
             Dictionary with node_id and status
         """
         try:
-            # Use Hippocampus Agent for ingestion
+            # Use Hippocampus Agent for intelligent ingestion
             result = await self.hippocampus.ingest_content(content, content_type)
 
             if result["status"] == "error":
@@ -147,7 +281,10 @@ class Orchestrator:
                 "node_ids": result["node_ids"],
                 "chunks_created": result["chunks_created"],
                 "content_type": result["content_type"],
-                "agents_used": ["hippocampus"]
+                "summary": result.get("summary", ""),
+                "key_concepts": result.get("key_concepts", []),
+                "agents_used": ["hippocampus"],
+                "model_used": "llama-3.2"
             }
 
         except Exception as e:
@@ -155,10 +292,17 @@ class Orchestrator:
             raise HTTPException(status_code=500, detail=f"Content ingestion failed: {str(e)}")
 
     def get_session_context(self, session_id: str) -> List[Dict]:
-        """Get conversation history for a session."""
-        return self.session_context.get(session_id, [])
+        """Get conversation history for a session from persistent storage."""
+        messages = self.chat_manager.get_chat_history(session_id)
+        # Convert to the expected format for backward compatibility
+        context = []
+        for msg in messages:
+            context.append({
+                "query" if msg["role"] == "user" else "response": msg["content"],
+                "timestamp": msg["timestamp"]
+            })
+        return context
 
     def clear_session(self, session_id: str):
-        """Clear conversation history for a session."""
-        if session_id in self.session_context:
-            del self.session_context[session_id]
+        """Clear conversation history for a session from persistent storage."""
+        self.chat_manager.delete_chat_session(session_id)
