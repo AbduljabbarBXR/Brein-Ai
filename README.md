@@ -201,102 +201,26 @@ GET /api/profiler/health         # Get system health status
 <details>
 <summary><strong>Click to expand detailed System Architecture Diagrams</strong></summary>
 
-### Core System Architecture (Text Diagram)
+### Core System Architecture
 
-```
-┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
-│    Web Interface    │    │      REST API       │    │    Mobile Apps      │
-│     (HTML/JS)       │    │     (FastAPI)       │    │   (React Native)    │
-└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
-           │                           │                           │
-           └───────────────────────────┼───────────────────────────┘
-                                       │
-                    ┌─────────────────────────────────┐
-                    │         Orchestrator            │
-                    │       (Multi-Agent)            │
-                    └─────────────────────────────────┘
-                               │           │
-               ┌───────────────┼───────────┴───────────────┐
-               │               │                           │
-    ┌──────────▼────────┐  ┌───▼────────┐  ┌──────────────▼──────────────┐
-    │   Hippocampus     │  │ Prefrontal  │  │        Thalamus            │
-    │    (Memory)       │  │   Cortex    │  │        Router              │
-    │                   │  │  (Reason)   │  │      (Routing)             │
-    └───────────────────┘  └─────────────┘  └─────────────────────────────┘
-               │               │                           │
-               └───────────────┼───────────────────────────┘
-                               │
-            ┌─────────────────────────────────────────────────┐
-            │              Memory Manager                     │
-            │   ┌─────────────────┬─────────────────┐        │
-            │   │     FAISS       │     SQLite      │        │
-            │   │   (Vectors)     │   (Metadata)    │        │
-            │   └─────────────────┴─────────────────┘        │
-            │   ┌───────────────────────────────────────┐    │
-            │   │          Neural Mesh                  │    │
-            │   │      (Associative Learning)           │    │
-            │   └───────────────────────────────────────┘    │
-            └─────────────────────────────────────────────────┘
-```
+<div align="center">
+  <img src="docs/images/core_system_architecture.png" alt="Core System Architecture" width="700"/>
+  <p><em>Figure 5: Core System Architecture - Complete data flow from user interfaces to memory storage</em></p>
+</div>
 
-### Brain-Inspired Multi-Agent Architecture (Text Diagram)
+### Brain-Inspired Multi-Agent Architecture
 
-```
-                              ┌─────────────────────────────────┐
-                              │    SYSTEM AWARENESS LAYER      │
-                              │         (SAL Core)             │
-                              │                                 │
-                              │  ┌─────────────┐ ┌─────────────┐ │
-                              │  │ Event Bus   │ │Message Router│ │
-                              │  └─────────────┘ └─────────────┘ │
-                              │                                 │
-                              │  ┌─────────────┐ ┌─────────────┐ │
-                              │  │Brain State  │ │Coordination │ │
-                              │  │Manager      │ │Engine       │ │
-                              │  └─────────────┘ └─────────────┘ │
-                              └─────────────────────────────────┘
-                                                │
-                              ┌─────────────────┼─────────────────┐
-                              │                 │                 │
-                   ┌──────────▼────────┐  ┌─────▼─────┐  ┌────────▼─────────┐
-                   │   Hippocampus     │  │  Amygdala  │  │    Thalamus      │
-                   │    (Memory)       │  │ (Emotion)  │  │    Router        │
-                   │                   │  │            │  │   (Routing)      │
-                   └───────────────────┘  └────────────┘  └──────────────────┘
-                              │                 │                 │
-                              └─────────────────┼─────────────────┘
-                                                │
-                              ┌─────────────────▼─────────────────┐
-                              │        Prefrontal Cortex          │
-                              │         (Reasoning)               │
-                              └───────────────────────────────────┘
-```
+<div align="center">
+  <img src="docs/images/brain_agent_architecture.png" alt="Brain-Inspired Multi-Agent Architecture" width="700"/>
+  <p><em>Figure 6: Brain-Inspired Multi-Agent Architecture - Four specialized agents coordinated through SAL</em></p>
+</div>
 
-### SAL Communication Flow (Text Diagram)
+### SAL Communication Flow
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                 SYSTEM AWARENESS LAYER (SAL)                       │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐     │
-│  │  Async Event    │  │   Message       │  │   Brain State    │     │
-│  │     Bus         │  │   Router        │  │   Manager        │     │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘     │
-│            │                        │                        │     │
-│            └────────────────────────┼────────────────────────┘     │
-│                                     │                               │
-│                    ┌────────────────▼────────────────┐              │
-│                    │      Coordination Engine         │              │
-│                    └──────────────────────────────────┘              │
-└─────────────────────────────────────────────────────────────────────┘
-                                      │
-                    ┌─────────────────┼─────────────────┐
-                    │                 │                 │
-          ┌─────────▼────────┐  ┌─────▼─────┐  ┌────────▼─────────┐
-          │  Agent Events    │  │Coordination│  │   State Updates  │
-          │   & Messages     │  │  Messages  │  │   & Sync         │
-          └──────────────────┘  └────────────┘  └──────────────────┘
-```
+<div align="center">
+  <img src="docs/images/sal_communication_flow.png" alt="SAL Communication Flow" width="700"/>
+  <p><em>Figure 7: SAL Communication Flow - Real-time inter-agent coordination and state management</em></p>
+</div>
 
 </details>
 
