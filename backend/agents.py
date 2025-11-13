@@ -19,9 +19,9 @@ class GGUFModelLoader:
     def __init__(self):
         self.models = {}  # Cache loaded models
         self.model_paths = {
-            "phi-3.1": os.path.join("..", "models", "Phi-3.1-mini-128k-instruct-Q4_K_M.gguf"),
-            "hermes": os.path.join("..", "models", "Hermes-3-Llama-3.2-3B.Q4_K_M.gguf"),
-            "llama-3.2": os.path.join("..", "models", "llama-3.2-1b-instruct-q4_k_m.gguf")
+            "phi-3.1": os.path.join("models", "Phi-3.1-mini-128k-instruct-Q4_K_M.gguf"),
+            "hermes": os.path.join("models", "Hermes-3-Llama-3.2-3B.Q4_K_M.gguf"),
+            "llama-3.2": os.path.join("models", "llama-3.2-1b-instruct-q4_k_m.gguf")
         }
 
     def load_model(self, model_name: str):
@@ -123,6 +123,15 @@ class HippocampusAgent:
             self.emotional_memory_boost = data['emotional_boost']
             logger.info(f"Hippocampus adjusting for emotional boost: {data['emotional_boost']}")
 
+            # Publish memory adjustment event
+            if self.sal:
+                await self.sal.event_bus.publish("hippocampus.memory_adjustment", {
+                    "adjustment_type": "emotional_boost",
+                    "boost_value": data['emotional_boost'],
+                    "reason": "Emotional context from amygdala",
+                    "timestamp": datetime.now().isoformat()
+                })
+
     async def on_reasoning_context(self, event: str, data: dict):
         """Respond to reasoning context from prefrontal cortex"""
         if data.get('focus_areas'):
@@ -176,7 +185,25 @@ class HippocampusAgent:
                 node_id = self.memory.add_memory(chunk, content_type)
                 node_ids.append(node_id)
 
-            return {
+            # Publish memory ingestion event to SAL
+            if self.sal:
+                await self.sal.event_bus.publish("hippocampus.memory_ingested", {
+                    "node_ids": node_ids,
+                    "content_type": content_type,
+                    "key_concepts": key_concepts,
+                    "chunks_created": len(chunks),
+                    "summary": summary[:200],  # Truncated for event
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                # Update brain state
+                await self.sal.brain_state.update_component_state("hippocampus", {
+                    "last_memory_ingestion": datetime.now().isoformat(),
+                    "nodes_created": len(node_ids),
+                    "active_memory_chunks": len(node_ids)
+                })
+
+            result = {
                 "status": "success",
                 "node_ids": node_ids,
                 "chunks_created": len(chunks),
@@ -186,8 +213,19 @@ class HippocampusAgent:
                 "agent": "hippocampus"
             }
 
+            return result
+
         except Exception as e:
             logger.error(f"HippocampusAgent ingestion error: {e}")
+
+            # Publish error event to SAL
+            if self.sal:
+                await self.sal.event_bus.publish("hippocampus.ingestion_error", {
+                    "error": str(e),
+                    "content_type": content_type,
+                    "timestamp": datetime.now().isoformat()
+                })
+
             error_msg = str(e) if self.prompt_manager else f"Error: {str(e)}"
             return {
                 "status": "error",
@@ -236,6 +274,27 @@ class PrefrontalCortexAgent:
             # Update reasoning context with new memory information
             self.available_memory_nodes = data.get('new_nodes', [])
             logger.info(f"Prefrontal cortex updated with {len(self.available_memory_nodes)} new memory nodes")
+
+        # Respond to memory ingestion events
+        if event == "hippocampus.memory_ingested":
+            # Analyze if new memories require reasoning attention
+            key_concepts = data.get('key_concepts', [])
+            reasoning_concepts = ['strategy', 'plan', 'analyze', 'evaluate', 'complex', 'system']
+
+            requires_reasoning = any(concept.lower() in reasoning_concepts for concept in key_concepts)
+
+            if requires_reasoning:
+                # Publish reasoning focus update
+                if self.sal:
+                    await self.sal.event_bus.publish("prefrontal_cortex.reasoning_focus", {
+                        "trigger": "memory_ingestion",
+                        "reasoning_concepts_detected": [c for c in key_concepts if c.lower() in reasoning_concepts],
+                        "memory_nodes": data.get('node_ids', []),
+                        "focus_type": "concept_driven",
+                        "attention_level": "high",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    logger.info(f"Prefrontal cortex focusing on reasoning concepts: {[c for c in key_concepts if c.lower() in reasoning_concepts]}")
 
     async def on_emotional_context(self, event: str, data: dict):
         """Respond to emotional context from amygdala"""
@@ -313,6 +372,25 @@ Please provide:
                     elif current_section == "recommendations":
                         recommendations += line + " "
 
+            # Publish reasoning completion event to SAL
+            if self.sal:
+                await self.sal.event_bus.publish("prefrontal_cortex.reasoning_complete", {
+                    "query_complexity": "high",
+                    "reasoning_steps": len(reasoning.split('.')) if reasoning else 0,
+                    "analysis_performed": bool(analysis.strip()),
+                    "recommendations_provided": bool(recommendations.strip()),
+                    "confidence": 0.85,
+                    "memory_context_used": len(memory_context) if memory_context else 0,
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                # Update brain state
+                await self.sal.brain_state.update_component_state("prefrontal_cortex", {
+                    "last_reasoning_task": datetime.now().isoformat(),
+                    "reasoning_complexity": "high",
+                    "active_reasoning_mode": "complex_analysis"
+                })
+
             return {
                 "response": final_response.strip(),
                 "analysis": analysis.strip(),
@@ -385,6 +463,26 @@ class AmygdalaAgent:
             # Enhance emotional processing with memory context
             self.memory_emotional_context = data
             logger.info("Amygdala enhanced with emotional memory context")
+
+        # Respond to memory ingestion events
+        if event == "hippocampus.memory_ingested":
+            # Analyze if new memories have emotional content
+            key_concepts = data.get('key_concepts', [])
+            emotional_concepts = ['emotion', 'feeling', 'happy', 'sad', 'angry', 'love', 'fear', 'joy']
+
+            has_emotional_content = any(concept.lower() in emotional_concepts for concept in key_concepts)
+
+            if has_emotional_content:
+                # Publish emotional context update for other agents
+                if self.sal:
+                    await self.sal.event_bus.publish("amygdala.emotional_context_update", {
+                        "trigger": "memory_ingestion",
+                        "emotional_concepts_detected": [c for c in key_concepts if c.lower() in emotional_concepts],
+                        "memory_nodes": data.get('node_ids', []),
+                        "context_type": "memory_driven",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    logger.info(f"Amygdala detected emotional content in new memories: {key_concepts}")
 
     async def on_reasoning_context(self, event: str, data: dict):
         """Respond to reasoning context from prefrontal cortex"""
@@ -463,6 +561,24 @@ Respond in a friendly, engaging way that shows you understand and care about the
             # Analyze emotional tone of response
             emotional_tone = self._analyze_emotional_tone(response)
 
+            # Publish emotional response event to SAL
+            if self.sal:
+                await self.sal.event_bus.publish("amygdala.emotional_response", {
+                    "query_emotion": emotional_context.get('tone', 'neutral'),
+                    "response_emotion": emotional_tone,
+                    "personality_traits": ["empathetic", "helpful", "conversational"],
+                    "confidence": 0.75,
+                    "memory_insights_used": len(memory_insights) if memory_insights else 0,
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                # Update brain state
+                await self.sal.brain_state.update_component_state("amygdala", {
+                    "last_emotional_response": datetime.now().isoformat(),
+                    "emotional_tone": emotional_tone,
+                    "active_personality_mode": "conversational"
+                })
+
             return {
                 "response": response,
                 "emotional_tone": emotional_tone,
@@ -518,7 +634,7 @@ class ThalamusRouter:
             })
             logger.info("ThalamusRouter connected to SAL")
 
-    def route_query(self, query: str, memory_results: List[Dict]) -> Dict[str, Any]:
+    async def route_query(self, query: str, memory_results: List[Dict]) -> Dict[str, Any]:
         """
         Analyze query complexity and route to appropriate model/agent.
 
@@ -559,6 +675,26 @@ class ThalamusRouter:
                 model_choice = "llama-3.2"
                 agent = "hippocampus"
                 reasoning = "Query can be handled with standard processing"
+
+            # Publish routing decision event to SAL
+            if self.sal:
+                await self.sal.event_bus.publish("thalamus_router.routing_decision", {
+                    "query_complexity": complexity_score,
+                    "selected_agent": agent,
+                    "selected_model": model_choice,
+                    "routing_reason": reasoning,
+                    "memory_results_count": len(memory_results) if memory_results else 0,
+                    "estimated_tokens": self._estimate_token_usage(query, complexity_score),
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                # Update brain state
+                await self.sal.brain_state.update_component_state("thalamus_router", {
+                    "last_routing_decision": datetime.now().isoformat(),
+                    "current_complexity_score": complexity_score,
+                    "active_agent": agent,
+                    "routing_efficiency": "high" if complexity_score < 0.5 else "adaptive"
+                })
 
             return {
                 "model": model_choice,

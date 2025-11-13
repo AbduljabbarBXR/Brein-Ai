@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from typing import Dict, List, Optional, Any
 import sys
 import os
+from datetime import datetime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from memory_manager import MemoryManager
@@ -15,6 +16,7 @@ from neural_mesh import NeuralMesh
 from neural_mesh import NeuralMesh
 from sal import SystemAwarenessLayer
 from prompt_manager import PromptManager
+from concept_extractor import SemanticConceptExtractor
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,14 +33,17 @@ class Orchestrator:
         self.memory_transformer = MemoryTransformer()
         self.neural_mesh = NeuralMesh()
 
-        # Initialize System Awareness Layer (SAL)
-        self.sal = SystemAwarenessLayer()
+        # Initialize System Awareness Layer (SAL) - disabled for performance
+        self.sal = None  # Disabled to reduce overhead
+
+        # Initialize Semantic Concept Extractor
+        self.concept_extractor = SemanticConceptExtractor()
 
         # Initialize GGUF model loader
         self.model_loader = GGUFModelLoader()
 
         # Initialize Prompt Manager (SAL connection will be established later)
-        self.prompt_manager = PromptManager(prompts_dir="prompts", sal=None)  # Don't pass SAL yet
+        self.prompt_manager = PromptManager(prompts_dir="backend/prompts", sal=None)  # Don't pass SAL yet
 
         # Initialize agents with model integration and prompt manager (SAL connection later)
         self.hippocampus = HippocampusAgent(memory_manager, self.model_loader, self.prompt_manager)
@@ -68,7 +73,10 @@ class Orchestrator:
             # Connect agents to SAL for inter-brain communication
             await self._connect_agents_to_sal()
 
-            logger.info("Orchestrator fully initialized with SAL integration")
+            # Start memory consolidation scheduler
+            await self._start_memory_consolidation_scheduler()
+
+            logger.info("Orchestrator fully initialized with memory consolidation (SAL disabled for performance)")
 
         except Exception as e:
             logger.error(f"Orchestrator initialization failed: {e}")
@@ -76,6 +84,11 @@ class Orchestrator:
 
     async def _connect_agents_to_sal(self):
         """Connect all agents to the System Awareness Layer"""
+        # SAL is disabled for performance - skip connection
+        if self.sal is None:
+            logger.info("SAL is disabled - skipping agent connections")
+            return
+
         try:
             # Initialize SAL if not already done
             if not self.sal.is_initialized:
@@ -132,7 +145,7 @@ class Orchestrator:
                     relevant_memory_chunks.append(chunk)
 
             # Use Thalamus Router for intelligent model selection
-            routing_decision = self.thalamus_router.route_query(query, relevant_memory_chunks)
+            routing_decision = await self.thalamus_router.route_query(query, relevant_memory_chunks)
 
             # Route to appropriate agent based on complexity
             if routing_decision["agent"] == "prefrontal_cortex":
@@ -205,10 +218,37 @@ Response generation: Created helpful response using memory-augmented context and
             # Extract memory node IDs for reinforcement
             memory_node_ids = [chunk["node_id"] for chunk in memory_chunks]
 
-            # Apply reinforcement learning via Basal Ganglia (simplified for now)
+            # Apply reinforcement learning via memory consolidation system
             if memory_node_ids:
                 confidence = agent_result.get("confidence", 0.5)
-                self._apply_conversation_reinforcement(memory_node_ids, confidence, query, agent_result["response"])
+                self._apply_memory_reinforcement(memory_node_ids, confidence, query, agent_result["response"],
+                                               session_id, session_history)
+
+            # Publish query completion event to SAL for coordination
+            if self.sal:
+                await self.sal.event_bus.publish("orchestrator.query_completed", {
+                    "query": query[:200],  # Truncated for event
+                    "agent_used": routing_decision["agent"],
+                    "response_length": len(agent_result["response"]),
+                    "confidence": agent_result.get("confidence", 0.5),
+                    "memory_chunks_used": len(relevant_memory_chunks),
+                    "processing_time": "estimated",  # Could be measured
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                # Trigger advanced coordination for complex queries
+                if routing_decision.get("complexity_score", 0) > 0.6:
+                    coordination_result = await self.sal.coordinate_brain_activity(
+                        "complex_reasoning",
+                        {
+                            "query": query,
+                            "complexity": routing_decision["complexity_score"],
+                            "memory_context": len(relevant_memory_chunks),
+                            "emotional_context": "analyze" in query.lower() or "feel" in query.lower()
+                        },
+                        "normal"
+                    )
+                    logger.info(f"Advanced coordination completed: {coordination_result.get('coordination_type', 'unknown')}")
 
             # Get policy decisions (simplified)
             policy_decision = {
@@ -240,7 +280,7 @@ Response generation: Created helpful response using memory-augmented context and
                     role="ai",
                     content=agent_result["response"],
                     thought_trace=thought_trace,
-                    memory_stats=result.get("memory_stats")
+                    memory_stats=self.memory.get_memory_stats()
                 )
 
             return {
@@ -365,82 +405,168 @@ Response generation: Created helpful response using memory-augmented context and
             })
         return context
 
-    def _apply_conversation_reinforcement(self, memory_node_ids: List[str], confidence: float,
-                                        user_query: str, ai_response: str):
+    def _apply_memory_reinforcement(self, memory_node_ids: List[str], confidence: float,
+                                   user_query: str, ai_response: str, session_id: Optional[str] = None,
+                                   session_history: Optional[List[Dict]] = None):
         """
-        Apply reinforcement learning based on successful conversation outcomes.
-        Strengthens connections between memory nodes that contributed to good responses.
+        Apply reinforcement learning using the memory consolidation system.
+        Strengthens memory nodes that contributed to successful responses.
 
         Args:
             memory_node_ids: List of memory node IDs that were retrieved
             confidence: Confidence score of the AI response
             user_query: The user's original query
             ai_response: The AI's response
+            session_id: Optional session identifier
+            session_history: Optional conversation history
         """
         try:
-            if len(memory_node_ids) < 2:
-                return  # Need at least 2 nodes to create connections
+            if not memory_node_ids:
+                return
 
-            # Calculate reinforcement strength based on confidence
-            base_reinforcement = min(0.3, confidence * 0.15)  # Scale confidence to meaningful reward
+            # Use the memory consolidator for reinforcement
+            reinforcement_result = self.memory.consolidator.reinforce_memory(
+                memory_node_ids, confidence, "conversation_reinforcement"
+            )
 
-            # Extract concepts from query and response for targeted reinforcement
-            query_concepts = self._extract_concepts_from_text(user_query)
-            response_concepts = self._extract_concepts_from_text(ai_response)
+            # Also maintain neural mesh connections for backward compatibility
+            if len(memory_node_ids) >= 2:
+                # Calculate reinforcement strength based on confidence
+                base_reinforcement = min(0.3, confidence * 0.15)
 
-            # Find overlapping concepts between query, response, and memory nodes
-            overlapping_concepts = set(query_concepts) & set(response_concepts)
+                # Extract concepts from query and response for targeted reinforcement
+                # Include conversation context for better concept extraction
+                conversation_context = {
+                    'session_id': session_id,
+                    'emotional_context': self._analyze_emotional_context(user_query, session_history),
+                    'conversation_history': session_history[-3:] if session_history else []
+                }
 
-            if overlapping_concepts:
-                # Boost reinforcement for nodes that helped answer the query
-                reinforcement_boost = base_reinforcement * (1 + len(overlapping_concepts) * 0.1)
+                query_concepts = self._extract_concepts_from_text(user_query, context=conversation_context)
+                response_concepts = self._extract_concepts_from_text(ai_response, context=conversation_context)
 
-                # Create connections between all memory nodes that contributed
-                for i in range(len(memory_node_ids)):
-                    for j in range(i + 1, len(memory_node_ids)):
-                        node_a = memory_node_ids[i]
-                        node_b = memory_node_ids[j]
+                # Find overlapping concepts between query, response, and memory nodes
+                overlapping_concepts = set(query_concepts) & set(response_concepts)
 
-                        # Apply reinforcement with concept overlap bonus
-                        self.memory.neural_mesh.reinforce_connection(
-                            node_a, node_b, reinforcement_boost
-                        )
+                if overlapping_concepts:
+                    # Boost reinforcement for nodes that helped answer the query
+                    reinforcement_boost = base_reinforcement * (1 + len(overlapping_concepts) * 0.1)
 
-                        # Also create direct semantic connections if concepts overlap significantly
-                        if len(overlapping_concepts) > 2:
-                            self.memory.neural_mesh.add_edge(
-                                node_a, node_b, reinforcement_boost * 0.5, "semantic_reinforcement"
+                    # Create connections between all memory nodes that contributed
+                    for i in range(len(memory_node_ids)):
+                        for j in range(i + 1, len(memory_node_ids)):
+                            node_a = memory_node_ids[i]
+                            node_b = memory_node_ids[j]
+
+                            # Apply reinforcement with concept overlap bonus
+                            self.memory.neural_mesh.reinforce_connection(
+                                node_a, node_b, reinforcement_boost
                             )
+
+                            # Also create direct semantic connections if concepts overlap significantly
+                            if len(overlapping_concepts) > 2:
+                                self.memory.neural_mesh.add_edge(
+                                    node_a, node_b, reinforcement_boost * 0.5, "semantic_reinforcement"
+                                )
+
+            logger.debug(f"Memory reinforcement applied: {reinforcement_result}")
 
         except Exception as e:
             # Don't let reinforcement failures break the conversation flow
-            logger.warning(f"Conversation reinforcement failed: {e}")
+            logger.warning(f"Memory reinforcement failed: {e}")
 
-    def _extract_concepts_from_text(self, text: str) -> List[str]:
+    def _extract_concepts_from_text(self, text: str, context: Optional[Dict] = None) -> List[str]:
         """
-        Extract key concepts from text for reinforcement learning.
+        Extract semantic concepts from text using advanced NLP processing.
 
         Args:
             text: Text to extract concepts from
+            context: Optional context information for context-aware extraction
 
         Returns:
-            List of key concepts
+            List of key concept names
         """
-        # Simple concept extraction
-        words = text.lower().split()
-        concepts = []
+        try:
+            # Use advanced semantic concept extraction
+            extracted_concepts = self.concept_extractor.extract_concepts_from_text(
+                text, context=context
+            )
 
-        # Filter out common stop words
-        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'what', 'how', 'why', 'when', 'where', 'who', 'this', 'that', 'these', 'those'}
-        min_word_length = 3
+            # Return concept names for backward compatibility
+            return [concept['name'] for concept in extracted_concepts]
 
-        for word in words:
-            word = word.strip('.,!?()[]{}')
-            if len(word) >= min_word_length and word not in stop_words:
-                concepts.append(word)
+        except Exception as e:
+            logger.warning(f"Advanced concept extraction failed: {e}. Falling back to simple extraction.")
+            # Fallback to simple extraction
+            words = text.lower().split()
+            concepts = []
 
-        return concepts[:15]  # Limit concepts
+            # Filter out common stop words
+            stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'what', 'how', 'why', 'when', 'where', 'who', 'this', 'that', 'these', 'those'}
+            min_word_length = 3
+
+            for word in words:
+                word = word.strip('.,!?()[]{}')
+                if len(word) >= min_word_length and word not in stop_words:
+                    concepts.append(word)
+
+            return concepts[:15]  # Limit concepts
 
     def clear_session(self, session_id: str):
         """Clear conversation history for a session from persistent storage."""
         self.chat_manager.delete_chat_session(session_id)
+
+    async def _start_memory_consolidation_scheduler(self):
+        """
+        Start background scheduler for memory consolidation tasks.
+        Runs periodic memory decay and consolidation operations.
+        """
+        import asyncio
+
+        async def consolidation_worker():
+            """Background worker for memory consolidation tasks."""
+            while True:
+                try:
+                    # Wait for 1 hour between consolidation cycles
+                    await asyncio.sleep(3600)  # 1 hour
+
+                    logger.info("Running scheduled memory consolidation...")
+
+                    # Apply memory decay (24 hours worth)
+                    decay_result = self.memory.consolidator.apply_memory_decay(24)
+                    logger.info(f"Memory decay applied: {decay_result}")
+
+                    # Consolidate similar memories
+                    consolidation_result = self.memory.consolidator.consolidate_similar_memories()
+                    logger.info(f"Memory consolidation completed: {consolidation_result}")
+
+                    # Update concept relationships and ontology
+                    try:
+                        self.concept_extractor.update_semantic_relationships()
+                        self.concept_extractor.build_concept_ontology()
+                        logger.info("Concept relationships and ontology updated")
+                    except Exception as e:
+                        logger.warning(f"Concept relationship update failed: {e}")
+
+                    # Get health report
+                    health_report = self.memory.consolidator.get_memory_health_report()
+                    health_score = health_report.get("health_score", 0)
+
+                    logger.info(f"Memory health score: {health_score:.2f}")
+
+                    # Publish consolidation event to SAL
+                    if self.sal:
+                        await self.sal.event_bus.publish("memory.consolidation_completed", {
+                            "decay_result": decay_result,
+                            "consolidation_result": consolidation_result,
+                            "health_score": health_score,
+                            "timestamp": datetime.now().isoformat()
+                        })
+
+                except Exception as e:
+                    logger.error(f"Error in memory consolidation scheduler: {e}")
+                    # Continue running despite errors
+
+        # Start the background worker
+        asyncio.create_task(consolidation_worker())
+        logger.info("Memory consolidation scheduler started")

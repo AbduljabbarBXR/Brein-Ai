@@ -151,21 +151,160 @@ class SystemAwarenessLayer:
 
     async def query_brain_state(self, component: str = None) -> dict:
         """
-        Query current brain state
+        Query current brain state with comprehensive monitoring
 
         Args:
             component: Specific component to query, or None for full state
 
         Returns:
-            dict: Brain state information
+            dict: Brain state information with health metrics
         """
         if component:
-            return await self.brain_state.get_component_state(component)
+            component_state = await self.brain_state.get_component_state(component)
+            # Add real-time health assessment
+            component_state['health_assessment'] = await self._assess_component_health(component, component_state)
+            return component_state
         else:
             full_state = await self.brain_state.get_full_brain_state()
             # Add system metrics
             full_state['system'] = await self.system_monitor.get_current_metrics()
+            # Add comprehensive brain health analysis
+            full_state['brain_health'] = await self._analyze_brain_health(full_state)
+            # Add inter-agent communication status
+            full_state['communication_status'] = await self.message_router.get_status()
+            # Add coordination analytics
+            full_state['coordination_analytics'] = await self.coordination_engine.get_coordination_analytics()
             return full_state
+
+    async def _assess_component_health(self, component: str, state: dict) -> dict:
+        """Assess health of individual brain component"""
+        health_score = 0.0
+        issues = []
+        recommendations = []
+
+        # Check basic connectivity
+        if state.get('status') != 'connected':
+            issues.append("Component not connected to SAL")
+            recommendations.append("Reconnect component to SAL")
+        else:
+            health_score += 0.3
+
+        # Check recent activity
+        last_activity = state.get('last_activity') or state.get('last_memory_ingestion') or state.get('last_emotional_response') or state.get('last_reasoning_task') or state.get('last_routing_decision')
+        if last_activity:
+            # Simple recency check (within last 5 minutes)
+            from datetime import datetime, timedelta
+            try:
+                last_activity_time = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                if datetime.now(last_activity_time.tzinfo) - last_activity_time < timedelta(minutes=5):
+                    health_score += 0.4
+                else:
+                    issues.append("Component has been inactive")
+                    recommendations.append("Check component activity")
+            except:
+                issues.append("Unable to parse activity timestamp")
+        else:
+            issues.append("No recent activity detected")
+            recommendations.append("Monitor component activity")
+
+        # Component-specific health checks
+        if component == 'hippocampus':
+            memory_load = state.get('memory_load', 0)
+            if memory_load > 1000:
+                issues.append("High memory load")
+                recommendations.append("Consider memory consolidation")
+            else:
+                health_score += 0.3
+
+        elif component == 'prefrontal_cortex':
+            if state.get('active_reasoning_mode') == 'complex_analysis':
+                health_score += 0.3  # Bonus for active complex reasoning
+
+        elif component == 'amygdala':
+            if state.get('emotional_tone') in ['enthusiastic', 'supportive']:
+                health_score += 0.3  # Bonus for positive emotional processing
+
+        elif component == 'thalamus_router':
+            if state.get('routing_efficiency') == 'high':
+                health_score += 0.3  # Bonus for efficient routing
+
+        return {
+            'health_score': min(health_score, 1.0),
+            'status': 'healthy' if health_score >= 0.7 else 'degraded' if health_score >= 0.4 else 'critical',
+            'issues': issues,
+            'recommendations': recommendations
+        }
+
+    async def _analyze_brain_health(self, full_state: dict) -> dict:
+        """Analyze overall brain health across all components"""
+        components = full_state.get('components', {})
+        total_components = len(components)
+        healthy_components = 0
+        critical_components = []
+        performance_metrics = {}
+
+        for name, state in components.items():
+            health = await self._assess_component_health(name, state)
+            if health['status'] == 'healthy':
+                healthy_components += 1
+            elif health['status'] == 'critical':
+                critical_components.append(name)
+
+            # Collect performance metrics
+            performance_metrics[name] = {
+                'health_score': health['health_score'],
+                'status': health['status'],
+                'active_tasks': len(state.get('active_tasks', [])),
+                'last_activity': state.get('last_activity')
+            }
+
+        overall_health = healthy_components / total_components if total_components > 0 else 0
+
+        # Communication health
+        comm_status = await self.message_router.get_status()
+        communication_health = 1.0 - (comm_status.get('errors', 0) / max(comm_status.get('messages_routed', 1), 1))
+
+        # System resource health
+        system_metrics = full_state.get('system', {})
+        system_health = 1.0
+        if system_metrics.get('cpu_usage', 0) > 90:
+            system_health -= 0.3
+        if system_metrics.get('memory_usage', 0) > 90:
+            system_health -= 0.3
+        if system_metrics.get('disk_usage', 0) > 95:
+            system_health -= 0.4
+
+        return {
+            'overall_health_score': (overall_health + communication_health + system_health) / 3,
+            'component_health': {
+                'total': total_components,
+                'healthy': healthy_components,
+                'degraded': total_components - healthy_components - len(critical_components),
+                'critical': len(critical_components),
+                'critical_components': critical_components
+            },
+            'communication_health': communication_health,
+            'system_health': system_health,
+            'performance_metrics': performance_metrics,
+            'recommendations': await self._generate_health_recommendations(overall_health, critical_components)
+        }
+
+    async def _generate_health_recommendations(self, overall_health: float, critical_components: list) -> list:
+        """Generate health recommendations based on current state"""
+        recommendations = []
+
+        if overall_health < 0.5:
+            recommendations.append("CRITICAL: Brain health is degraded - immediate attention required")
+        elif overall_health < 0.7:
+            recommendations.append("WARNING: Brain health is suboptimal - monitor closely")
+
+        if critical_components:
+            recommendations.append(f"Address critical components: {', '.join(critical_components)}")
+
+        if not recommendations:
+            recommendations.append("Brain health is optimal - continue monitoring")
+
+        return recommendations
 
     async def coordinate_brain_activity(self, activity_type: str, context: dict, priority: str = "normal") -> dict:
         """

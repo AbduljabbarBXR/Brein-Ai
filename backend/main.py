@@ -18,6 +18,9 @@ from web_fetcher import WebFetcher
 from audit_logger import AuditLogger
 from test_harness import TestHarness
 from profiler import PerformanceProfiler
+from vision_processor import VisionProcessor
+from audio_processor import AudioProcessor
+from multi_modal_fusion import MultiModalFusionEngine
 import logging
 
 # Configure logging
@@ -59,6 +62,35 @@ app.add_middleware(
 memory_manager = MemoryManager(db_path="memory/brein_memory.db")
 chat_manager = ChatManager(db_path="chats/brein_chats.db")
 orchestrator = Orchestrator(memory_manager, chat_manager)
+
+# Initialize multi-modal components
+try:
+    vision_processor = VisionProcessor()
+    logger.info("Vision processor initialized successfully")
+except Exception as e:
+    logger.warning(f"Vision processor initialization failed: {e}")
+    vision_processor = None
+
+try:
+    audio_processor = AudioProcessor()
+    logger.info("Audio processor initialized successfully")
+except Exception as e:
+    logger.warning(f"Audio processor initialization failed (audio dependencies may be missing): {e}")
+    logger.info("Continuing without audio processing capabilities")
+    audio_processor = None
+
+try:
+    fusion_engine = MultiModalFusionEngine(
+        memory_manager=memory_manager,
+        concept_extractor=orchestrator.concept_extractor,
+        vision_processor=vision_processor,
+        audio_processor=audio_processor
+    )
+    logger.info("Multi-modal fusion engine initialized successfully")
+except Exception as e:
+    logger.warning(f"Multi-modal fusion engine initialization failed: {e}")
+    fusion_engine = None
+
 # model_exporter = ModelExporter()  # Temporarily disabled - requires onnxruntime
 sync_manager = SyncManager()
 web_fetcher = WebFetcher(memory_manager)
@@ -178,6 +210,144 @@ async def get_full_neural_mesh():
 async def search_memory(query: str, top_k: int = 5):
     """Search memory for similar content"""
     return {"results": memory_manager.search_memory(query, top_k)}
+
+# Concept analysis endpoints
+@app.get("/api/concepts/search")
+async def search_concepts(query: str, top_k: int = 10):
+    """Search concepts by semantic similarity"""
+    results = orchestrator.concept_extractor.search_concepts_by_similarity(query, top_k)
+    return {"results": [{"concept_id": cid, "similarity": sim} for cid, sim in results]}
+
+@app.get("/api/concepts/{concept_id}")
+async def get_concept_details(concept_id: str):
+    """Get detailed information about a specific concept"""
+    if concept_id not in orchestrator.concept_extractor.concepts:
+        raise HTTPException(status_code=404, detail="Concept not found")
+
+    concept = orchestrator.concept_extractor.concepts[concept_id]
+    evolution = orchestrator.concept_extractor.get_concept_evolution(concept_id)
+    related = orchestrator.concept_extractor.find_related_concepts(concept_id, top_k=10)
+    context = orchestrator.concept_extractor.get_concept_context(concept_id, max_contexts=5)
+
+    return {
+        "concept": concept,
+        "evolution": evolution,
+        "related_concepts": [{"concept_id": cid, "weight": w} for cid, w in related],
+        "context_history": context
+    }
+
+@app.get("/api/concepts/{concept_id}/related")
+async def get_related_concepts(concept_id: str, top_k: int = 10):
+    """Get concepts related to a specific concept"""
+    if concept_id not in orchestrator.concept_extractor.concept_graph:
+        raise HTTPException(status_code=404, detail="Concept not found")
+
+    related = orchestrator.concept_extractor.find_related_concepts(concept_id, top_k)
+    return {"related_concepts": [{"concept_id": cid, "weight": w} for cid, w in related]}
+
+@app.get("/api/concepts/{concept_id}/evolution")
+async def get_concept_evolution(concept_id: str):
+    """Get temporal evolution data for a concept"""
+    if concept_id not in orchestrator.concept_extractor.concepts:
+        raise HTTPException(status_code=404, detail="Concept not found")
+
+    evolution = orchestrator.concept_extractor.get_concept_evolution(concept_id)
+    return {"evolution": evolution}
+
+@app.get("/api/concepts/stats")
+async def get_concept_stats():
+    """Get comprehensive concept system statistics"""
+    stats = orchestrator.concept_extractor.get_concept_stats()
+    return {"stats": stats}
+
+@app.post("/api/concepts/build-ontology")
+async def build_concept_ontology():
+    """Build hierarchical concept relationships (ontology)"""
+    orchestrator.concept_extractor.build_concept_ontology()
+    return {"status": "completed", "message": "Concept ontology built successfully"}
+
+@app.post("/api/concepts/update-relationships")
+async def update_concept_relationships():
+    """Update semantic relationships in the concept graph"""
+    orchestrator.concept_extractor.update_semantic_relationships()
+    return {"status": "completed", "message": "Concept relationships updated successfully"}
+
+@app.post("/api/concepts/cleanup")
+async def cleanup_old_concepts(days_threshold: int = 90):
+    """Remove concepts that haven't been accessed recently"""
+    removed_count = orchestrator.concept_extractor.cleanup_old_concepts(days_threshold)
+    return {"status": "completed", "concepts_removed": removed_count}
+
+@app.get("/api/concepts/graph")
+async def get_concept_graph():
+    """Get concept relationship graph for visualization"""
+    # Convert NetworkX graph to serializable format
+    nodes = []
+    for node_id, node_data in orchestrator.concept_extractor.concept_graph.nodes(data=True):
+        concept_name = orchestrator.concept_extractor.concepts.get(node_id, {}).get('name', node_id)
+        importance = orchestrator.concept_extractor.concepts.get(node_id, {}).get('importance_score', 0.5)
+        nodes.append({
+            "id": node_id,
+            "name": concept_name,
+            "importance": importance,
+            "group": 1  # For visualization grouping
+        })
+
+    edges = []
+    for u, v, data in orchestrator.concept_extractor.concept_graph.edges(data=True):
+        edges.append({
+            "source": u,
+            "target": v,
+            "weight": data.get('weight', 0.1)
+        })
+
+    return {"nodes": nodes, "edges": edges}
+
+@app.get("/api/concepts/hierarchy")
+async def get_concept_hierarchy():
+    """Get concept hierarchy for visualization"""
+    # Convert NetworkX DiGraph to serializable format
+    nodes = []
+    for node_id in orchestrator.concept_extractor.concept_hierarchy.nodes():
+        concept_name = orchestrator.concept_extractor.concepts.get(node_id, {}).get('name', node_id)
+        nodes.append({
+            "id": node_id,
+            "name": concept_name
+        })
+
+    edges = []
+    for u, v, data in orchestrator.concept_extractor.concept_hierarchy.edges(data=True):
+        edges.append({
+            "source": u,
+            "target": v,
+            "weight": data.get('weight', 0.1)
+        })
+
+    return {"nodes": nodes, "edges": edges}
+
+@app.post("/api/memory/consolidate/decay")
+async def apply_memory_decay(hours_since_last_decay: float = 24):
+    """Apply time-based memory decay to all nodes"""
+    result = memory_manager.consolidator.apply_memory_decay(hours_since_last_decay)
+    return {"status": "completed", "result": result}
+
+@app.post("/api/memory/consolidate/similar")
+async def consolidate_similar_memories():
+    """Find and consolidate similar memories to prevent redundancy"""
+    result = memory_manager.consolidator.consolidate_similar_memories()
+    return {"status": "completed", "result": result}
+
+@app.get("/api/memory/consolidate/health")
+async def get_memory_health_report():
+    """Generate comprehensive memory health report"""
+    report = memory_manager.consolidator.get_memory_health_report()
+    return {"status": "success", "report": report}
+
+@app.post("/api/memory/consolidate/reinforce")
+async def reinforce_memory_nodes(node_ids: List[str], strength: float = 0.5, reason: str = "manual_reinforcement"):
+    """Manually reinforce specific memory nodes"""
+    result = memory_manager.consolidator.reinforce_memory(node_ids, strength, reason)
+    return {"status": "completed", "result": result}
 
 # Chat management endpoints
 @app.post("/api/chats")
@@ -426,6 +596,165 @@ async def generate_performance_report():
     """Generate and save performance report"""
     filepath = performance_profiler.save_performance_report()
     return {"report_path": filepath}
+
+# Multi-modal processing endpoints
+@app.post("/api/vision/analyze")
+async def analyze_image(image_data: Dict[str, Any]):
+    """
+    Analyze an image and extract visual concepts.
+
+    Expected input: {"image": "base64_string_or_path", "context": {...}}
+    """
+    if not vision_processor:
+        raise HTTPException(status_code=503, detail="Vision processing not available")
+
+    try:
+        result = vision_processor.process_image(
+            image_data.get("image"),
+            context=image_data.get("context")
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Image analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Image analysis failed: {str(e)}")
+
+@app.post("/api/audio/analyze")
+async def analyze_audio(audio_data: Dict[str, Any]):
+    """
+    Analyze audio and extract speech and audio concepts.
+
+    Expected input: {"audio": "base64_string_or_path", "context": {...}}
+    """
+    if not audio_processor:
+        raise HTTPException(status_code=503, detail="Audio processing not available")
+
+    try:
+        result = audio_processor.process_audio(
+            audio_data.get("audio"),
+            context=audio_data.get("context")
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Audio analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Audio analysis failed: {str(e)}")
+
+@app.post("/api/audio/record")
+async def record_audio(duration: int = 5, save_path: Optional[str] = None):
+    """
+    Record audio from microphone.
+
+    Args:
+        duration: Recording duration in seconds
+        save_path: Optional path to save the recording
+    """
+    if not audio_processor:
+        raise HTTPException(status_code=503, detail="Audio processing not available")
+
+    try:
+        audio_segment = audio_processor.record_audio(duration, save_path)
+        if audio_segment:
+            return {
+                "success": True,
+                "duration": len(audio_segment) / 1000,
+                "message": f"Recorded {len(audio_segment) / 1000:.1f} seconds of audio"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Audio recording failed")
+    except Exception as e:
+        logger.error(f"Audio recording failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Audio recording failed: {str(e)}")
+
+@app.post("/api/multimodal/fuse")
+async def fuse_multi_modal_inputs(inputs: Dict[str, Any]):
+    """
+    Process and fuse multiple modalities of input.
+
+    Expected input: {"text": "string", "image": "base64_or_path", "audio": "base64_or_path", "context": {...}}
+    """
+    if not fusion_engine:
+        raise HTTPException(status_code=503, detail="Multi-modal fusion not available")
+
+    try:
+        result = fusion_engine.process_multi_modal_input(
+            inputs,
+            context=inputs.get("context")
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Multi-modal fusion failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Multi-modal fusion failed: {str(e)}")
+
+@app.get("/api/multimodal/search")
+async def search_multi_modal(query: str, modalities: Optional[List[str]] = None):
+    """
+    Search across multi-modal memories.
+
+    Args:
+        query: Search query
+        modalities: Optional list of modalities to focus on
+    """
+    if not fusion_engine:
+        raise HTTPException(status_code=503, detail="Multi-modal fusion not available")
+
+    try:
+        result = fusion_engine.search_multi_modal(query, modalities)
+        return result
+    except Exception as e:
+        logger.error(f"Multi-modal search failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Multi-modal search failed: {str(e)}")
+
+@app.post("/api/vision/compare")
+async def compare_images(image1: Any, image2: Any):
+    """
+    Compare two images for similarity.
+
+    Expected input: {"image1": "base64_or_path", "image2": "base64_or_path"}
+    """
+    if not vision_processor:
+        raise HTTPException(status_code=503, detail="Vision processing not available")
+
+    try:
+        result = vision_processor.compare_images(image1, image2)
+        return result
+    except Exception as e:
+        logger.error(f"Image comparison failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Image comparison failed: {str(e)}")
+
+@app.post("/api/audio/compare")
+async def compare_audio(audio1: Any, audio2: Any):
+    """
+    Compare two audio samples for similarity.
+
+    Expected input: {"audio1": "base64_or_path", "audio2": "base64_or_path"}
+    """
+    if not audio_processor:
+        raise HTTPException(status_code=503, detail="Audio processing not available")
+
+    try:
+        result = audio_processor.compare_audio(audio1, audio2)
+        return result
+    except Exception as e:
+        logger.error(f"Audio comparison failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Audio comparison failed: {str(e)}")
+
+@app.get("/api/multimodal/stats")
+async def get_multi_modal_stats():
+    """Get statistics about multi-modal processing components."""
+    stats = {
+        "vision": {
+            "available": vision_processor is not None,
+            "cache_stats": vision_processor.get_cache_stats() if vision_processor else None
+        },
+        "audio": {
+            "available": audio_processor is not None,
+            "cache_stats": audio_processor.get_cache_stats() if audio_processor else None
+        },
+        "fusion": {
+            "available": fusion_engine is not None,
+            "fusion_stats": fusion_engine.get_fusion_stats() if fusion_engine else None
+        }
+    }
+    return stats
 
 # Model export endpoints (temporarily disabled - requires onnxruntime)
 # @app.post("/api/models/export-mobile-bundle")

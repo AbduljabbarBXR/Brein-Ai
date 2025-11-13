@@ -325,3 +325,76 @@ class PerformanceTimer:
             end_time,
             self.metadata
         )
+
+
+def performance_monitor(operation_name: str, profiler: Optional[PerformanceProfiler] = None):
+    """
+    Decorator to monitor performance of functions.
+
+    Args:
+        operation_name: Name of the operation for logging
+        profiler: PerformanceProfiler instance (if None, creates a global one)
+
+    Returns:
+        Decorated function
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # Get or create profiler
+            prof = profiler or _get_global_profiler()
+
+            start_time = time.time()
+            try:
+                result = func(*args, **kwargs)
+                end_time = time.time()
+
+                # Log successful operation
+                prof.log_operation(
+                    operation_name,
+                    start_time,
+                    end_time,
+                    {
+                        "function": func.__name__,
+                        "module": func.__module__,
+                        "success": True
+                    }
+                )
+
+                return result
+
+            except Exception as e:
+                end_time = time.time()
+
+                # Log failed operation
+                prof.log_operation(
+                    operation_name,
+                    start_time,
+                    end_time,
+                    {
+                        "function": func.__name__,
+                        "module": func.__module__,
+                        "success": False,
+                        "error": str(e)
+                    }
+                )
+
+                raise e
+
+        return wrapper
+    return decorator
+
+
+# Global profiler instance
+_global_profiler = None
+
+def _get_global_profiler() -> PerformanceProfiler:
+    """Get or create global profiler instance."""
+    global _global_profiler
+    if _global_profiler is None:
+        _global_profiler = PerformanceProfiler()
+    return _global_profiler
+
+def set_global_profiler(profiler: PerformanceProfiler):
+    """Set the global profiler instance."""
+    global _global_profiler
+    _global_profiler = profiler

@@ -14,7 +14,7 @@ class NeuralMesh:
 
     def __init__(self, mesh_file: str = "memory/neural_mesh.json"):
         """
-        Initialize the Neural Mesh.
+        Initialize the Neural Mesh with optimized data structures.
 
         Args:
             mesh_file: Path to store the mesh data
@@ -23,6 +23,12 @@ class NeuralMesh:
         self.nodes: Dict[str, Dict] = {}  # node_id -> node_data
         self.edges: Dict[Tuple[str, str], Dict] = {}  # (node_a, node_b) -> edge_data
         self.adjacency: Dict[str, Set[str]] = defaultdict(set)  # node_id -> connected_nodes
+
+        # Performance optimizations
+        self.node_cache: Dict[str, Dict] = {}  # Recently accessed nodes
+        self.cache_size = 1000  # Maximum cached nodes
+        self.dirty_nodes = set()  # Track modified nodes for selective saving
+        self.dirty_edges = set()  # Track modified edges for selective saving
 
         # Ensure memory directory exists
         os.makedirs(os.path.dirname(mesh_file), exist_ok=True)
