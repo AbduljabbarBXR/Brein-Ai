@@ -137,19 +137,40 @@ class NeuralMesh:
     def reinforce_connection(self, node_a: str, node_b: str, delta: float = 0.1) -> None:
         """
         Apply Hebbian reinforcement to strengthen the connection between two nodes.
+        Creates a connection if one doesn't exist (neurons that fire together wire together).
 
         Args:
             node_a: First node ID
             node_b: Second node ID
             delta: Amount to increase connection strength
         """
+        # Ensure both nodes exist
+        if node_a not in self.nodes:
+            self.add_node(node_a)
+        if node_b not in self.nodes:
+            self.add_node(node_b)
+
         edge_key = tuple(sorted([node_a, node_b]))
 
-        if edge_key in self.edges:
+        if edge_key not in self.edges:
+            # Create new connection (Hebbian learning principle)
+            self.edges[edge_key] = {
+                'weight': delta,
+                'reinforcement_count': 1,
+                'last_reinforced': datetime.now().isoformat(),
+                'edge_type': 'hebbian',
+                'created_at': datetime.now().isoformat()
+            }
+            # Update adjacency
+            self.adjacency[node_a].add(node_b)
+            self.adjacency[node_b].add(node_a)
+        else:
+            # Strengthen existing connection
             self.edges[edge_key]['weight'] = min(1.0, self.edges[edge_key]['weight'] + delta)
             self.edges[edge_key]['reinforcement_count'] += 1
             self.edges[edge_key]['last_reinforced'] = datetime.now().isoformat()
-            self._save_mesh()
+
+        self._save_mesh()
 
     def activate_node(self, node_id: str) -> None:
         """

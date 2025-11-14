@@ -1,10 +1,24 @@
 {
-  "version": "1.0",
-  "description": "Prompts for Orchestrator - query processing and response generation",
+  "version": "2.0",
+  "description": "Adaptive Prompts for Orchestrator - dynamic prompt selection based on user behavior and context",
   "prompts": {
     "internal_reasoning": "Think step by step about how to answer: {query}\n\nList the key points to cover in plain text:",
-    "standard_response": "Provide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose.",
-    "contextual_response": "Using this context:\n{context}\n\nProvide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose.",
+    "standard_response": {
+      "concise": "Provide a brief, direct answer to: {query}\n\nBe concise and to the point.",
+      "detailed": "Provide a comprehensive, thorough explanation of: {query}\n\nInclude relevant details, examples, and context to ensure complete understanding.",
+      "conversational": "I'd be happy to help explain: {query}\n\nLet me break this down in a friendly, conversational way that makes sense.",
+      "technical": "Provide a precise, technical explanation of: {query}\n\nUse accurate terminology and focus on technical accuracy.",
+      "tutorial": "Let me guide you through understanding: {query}\n\nI'll explain this step by step, starting with the basics and building up to the complete picture.",
+      "visual": "I'll help you visualize and understand: {query}\n\nThink of it this way - imagine you're looking at a diagram where..."
+    },
+    "contextual_response": {
+      "concise": "Based on the available context, provide a brief answer to: {query}\n\nContext: {context}\n\nBe direct and focus on the key information.",
+      "detailed": "Using the provided context, give a comprehensive explanation of: {query}\n\nContext: {context}\n\nDraw connections between the context and the query, providing thorough analysis.",
+      "conversational": "Looking at what we know from our previous conversation, let me help explain: {query}\n\nContext: {context}\n\nI'll connect this to what we've discussed before in a natural way.",
+      "technical": "Based on the technical context provided, analyze: {query}\n\nContext: {context}\n\nProvide precise technical insights with accurate terminology.",
+      "tutorial": "Let me walk you through this step by step using our conversation context: {query}\n\nContext: {context}\n\nWe'll build understanding progressively, connecting each piece.",
+      "visual": "Let me help you visualize how this fits with what we know: {query}\n\nContext: {context}\n\nPicture this as a system where the context forms the foundation..."
+    },
     "thought_trace_complex": "Complex reasoning activated.\n\nAnalysis: {analysis}\n\nStep-by-step reasoning: {reasoning_steps}\n\nDecision making: Query routed to prefrontal cortex due to complexity score of {complexity_score:.2f}. Using advanced reasoning capabilities.",
     "thought_trace_emotional": "Emotional processing activated.\n\nEmotional context analysis: Detected tone '{emotional_tone}' with urgency level '{urgency}'.\n\nMemory insights considered: {memory_insights}\n\nPersonality response strategy: Using emotional intelligence to generate empathetic, conversational response.",
     "thought_trace_standard": "Internal reasoning: {cleaned_thought}\n\nQuery routing: Complexity score {complexity_score:.2f} determined standard processing appropriate.{memory_context_info}\n\nResponse generation: Created helpful response using memory-augmented context and step-by-step reasoning.",

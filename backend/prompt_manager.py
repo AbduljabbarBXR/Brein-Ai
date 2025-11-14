@@ -6,10 +6,12 @@ Manages externalized prompts with SAL integration for dynamic optimization.
 import json
 import os
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from dynamic_prompt_filter import DynamicPromptFilter
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,9 @@ class PromptManager:
         self.prompts = {}
         self.prompt_versions = {}
         self.prompt_metrics = {}
+
+        # Initialize dynamic prompt filter
+        self.dynamic_filter = DynamicPromptFilter(prompts_dir=prompts_dir)
 
         # Load all prompts on initialization
         self._load_all_prompts()
@@ -175,7 +180,19 @@ class PromptManager:
             # If subkey specified, look for nested structure
             if subkey:
                 if subkey in prompts:
-                    return prompts[subkey]
+                    subkey_value = prompts[subkey]
+                    # If subkey value is a dict (variants), use variant parameter
+                    if isinstance(subkey_value, dict):
+                        if variant in subkey_value:
+                            return subkey_value[variant]
+                        elif 'default' in subkey_value:
+                            return subkey_value['default']
+                        else:
+                            # Return first available variant
+                            return next(iter(subkey_value.values()))
+                    else:
+                        # Subkey value is a direct string
+                        return subkey_value
                 else:
                     raise ValueError(f"Subkey '{subkey}' not found in prompts")
 
@@ -274,3 +291,124 @@ class PromptManager:
     def list_available_prompts(self) -> List[str]:
         """List all available prompt keys"""
         return list(self.prompts.keys())
+
+    async def get_adaptive_prompt(self, base_prompt_key: str, user_id: str, query: str,
+                          context: Optional[Dict[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
+        """
+        Get an adaptive prompt based on user behavior and context analysis.
+
+        Args:
+            base_prompt_key: Base prompt key to adapt (can include subkeys like 'system.orchestrator.standard_response')
+            user_id: User identifier for behavior analysis
+            query: User's query for context analysis
+            context: Additional context information
+
+        Returns:
+            Tuple of (selected_variant, adaptation_metadata)
+        """
+        try:
+            # Parse prompt key to handle subkeys (e.g., 'system.orchestrator.standard_response')
+            key_parts = base_prompt_key.split('.')
+            if len(key_parts) >= 3:  # Has subkey
+                base_key = '.'.join(key_parts[:2])  # 'system.orchestrator'
+                subkey = '.'.join(key_parts[2:])    # 'standard_response'
+                metadata_key = base_key
+                available_variants = [v for v in self.dynamic_filter.prompt_metadata.get(metadata_key, {}).get('variants', [])
+                                    if v['name'].startswith(f"{subkey}.")]
+                variant_prefix = f"{subkey}."
+            else:
+                base_key = base_prompt_key
+                subkey = None
+                metadata_key = base_prompt_key
+                available_variants = None
+                variant_prefix = ""
+
+            # Use dynamic filter to get adaptive prompt
+            selected_variant, adaptation_metadata = self.dynamic_filter.get_adaptive_prompt(
+                metadata_key, user_id, query, context, available_variants
+            )
+
+            # Remove prefix if present for prompt retrieval
+            if selected_variant.startswith(variant_prefix):
+                prompt_variant = selected_variant[len(variant_prefix):]
+            else:
+                prompt_variant = selected_variant
+
+            # Prepare variables for substitution (query and context)
+            variables = {'query': query}
+            if context:
+                variables.update(context)
+
+            # Get the actual prompt text using the selected variant
+            if subkey:
+                # For subkey prompts, get the specific sub-prompt variant
+                prompt_text = self.get_prompt(f"{base_key}.{subkey}", variant=prompt_variant, **variables)
+            else:
+                prompt_text = self.get_prompt(base_key, variant=prompt_variant, **variables)
+
+            # Add the prompt text to metadata
+            adaptation_metadata['prompt_text'] = prompt_text
+
+            # Track adaptive usage
+            self._track_adaptive_usage(base_prompt_key, selected_variant, adaptation_metadata)
+
+            return prompt_text, adaptation_metadata
+
+        except Exception as e:
+            logger.error(f"Failed to get adaptive prompt for {base_prompt_key}: {e}")
+            # Fallback to regular prompt
+            try:
+                fallback_prompt = self.get_prompt(base_prompt_key)
+                return fallback_prompt, {'fallback': True, 'error': str(e)}
+            except Exception as fallback_error:
+                logger.error(f"Fallback prompt also failed: {fallback_error}")
+                return "Please provide a helpful response.", {'fallback': True, 'error': str(fallback_error)}
+
+    def _track_adaptive_usage(self, prompt_key: str, variant: str, adaptation_metadata: Dict[str, Any]):
+        """Track usage of adaptive prompts for optimization"""
+        if 'adaptive_usage' not in self.prompt_metrics:
+            self.prompt_metrics['adaptive_usage'] = {
+                'total_adaptive_calls': 0,
+                'by_style': {},
+                'by_complexity': {},
+                'by_emotion': {},
+                'avg_adaptation_confidence': []
+            }
+
+        adaptive_stats = self.prompt_metrics['adaptive_usage']
+        adaptive_stats['total_adaptive_calls'] += 1
+
+        # Track by different adaptation criteria
+        user_analysis = adaptation_metadata.get('user_analysis', {})
+        recommendations = user_analysis.get('recommendations', {})
+
+        style = recommendations.get('suggested_response_style', 'unknown')
+        if style not in adaptive_stats['by_style']:
+            adaptive_stats['by_style'][style] = 0
+        adaptive_stats['by_style'][style] += 1
+
+        # Track confidence scores
+        confidence = user_analysis.get('profile_confidence', 0.5)
+        adaptive_stats['avg_adaptation_confidence'].append(confidence)
+
+        # Keep only last 100 confidence scores
+        if len(adaptive_stats['avg_adaptation_confidence']) > 100:
+            adaptive_stats['avg_adaptation_confidence'] = adaptive_stats['avg_adaptation_confidence'][-100:]
+
+    def get_adaptive_analytics(self) -> Dict[str, Any]:
+        """Get analytics about adaptive prompt usage"""
+        if 'adaptive_usage' not in self.prompt_metrics:
+            return {'error': 'No adaptive usage data available'}
+
+        adaptive_stats = self.prompt_metrics['adaptive_usage']
+
+        # Calculate averages
+        avg_confidence = (sum(adaptive_stats['avg_adaptation_confidence']) /
+                         len(adaptive_stats['avg_adaptation_confidence'])) if adaptive_stats['avg_adaptation_confidence'] else 0
+
+        return {
+            'total_adaptive_calls': adaptive_stats['total_adaptive_calls'],
+            'style_distribution': adaptive_stats['by_style'],
+            'average_adaptation_confidence': avg_confidence,
+            'most_used_style': max(adaptive_stats['by_style'].items(), key=lambda x: x[1])[0] if adaptive_stats['by_style'] else 'none'
+        }

@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/python-3.8+-blue?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
-Brein AI is a revolutionary memory-first artificial intelligence system inspired by the human brain's architecture. It combines advanced vector databases, neural mesh learning, multi-agent processing, and comprehensive safety measures to create a powerful yet safe AI assistant.
+Brein AI is a **simplified and stable** memory-first artificial intelligence system. We've removed complex SAL integration and reinforcement learning to create a reliable, working system focused on core functionality: memory management, conversation handling, and intelligent query processing.
 
 ## 📖 Table of Contents
 
@@ -27,33 +27,30 @@ Brein AI is a revolutionary memory-first artificial intelligence system inspired
 
 ## 🧠 Core Features
 
-### Memory-First Architecture
+### Memory-First Architecture (✅ Fully Working)
 - **Vector Database**: FAISS-powered similarity search with SSD offload
-- **Neural Mesh**: Hebbian learning for associative memory connections
-- **Hierarchical Memory**: Working, long-term, and episodic memory types
+- **Simple Neural Mesh**: Basic associative memory connections
+- **Hierarchical Memory**: Working memory with persistent SQLite storage
 - **LRU Caching**: Intelligent memory management for optimal performance
 
-### Multi-Agent Brain Architecture
-- **Hippocampus Agent**: Memory encoding and ingestion
-- **Prefrontal Cortex Agent**: Complex reasoning and planning
-- **Amygdala Agent**: Emotional intelligence and personality
-- **Thalamus Router**: Intelligent query routing and model selection
+### Simplified Multi-Agent System (✅ Streamlined)
+- **Hippocampus Agent**: Basic memory encoding and ingestion
+- **Prefrontal Cortex Agent**: Complex reasoning (when needed)
+- **Amygdala Agent**: Personality-driven responses with GGUF models
+- **Thalamus Router**: Simple query routing based on complexity
 
-### Safety & Security
-- **Web Content Pipeline**: Fetch → Sanitize → Vet → Quarantine → Review → Ingest
-- **Audit Logging**: Complete provenance tracking for all operations
-- **Content Quarantine**: Human oversight for web content ingestion
-- **Access Controls**: Per-query web access toggling
+### What We Removed (For Stability)
+- **❌ Disabled SAL**: System Awareness Layer (causing freezes)
+- **❌ Disabled Reinforcement Learning**: Memory consolidation (unstable)
+- **❌ Complex Prompt Management**: Using simple hardcoded prompts
+- **❌ Web Content Pipeline**: Not implemented yet
 
-### Mobile & Offline Capabilities
-- **Model Export**: ONNX/TFLite conversion for mobile deployment
-- **Delta Sync**: Efficient synchronization between cloud and devices
-- **Offline Bundles**: Pre-packaged data for offline operation
-
-### Performance & Monitoring
-- **Real-time Profiling**: System performance monitoring
-- **Comprehensive Testing**: Automated test harness with 1000+ sample documents
-- **Health Monitoring**: System health status and alerts
+### Current Capabilities (✅ Production Ready)
+- **Query Processing**: FastAPI REST API with chat memory
+- **Model Integration**: GGUF models (Llama-3.2, Phi-3.1, Hermes)
+- **Conversation Continuity**: Remembers context for follow-ups
+- **Memory Search**: Efficient vector similarity search
+- **Basic Learning**: Simple background conversation learning
 
 ## 🚀 Quick Start
 
@@ -273,64 +270,31 @@ GET /api/profiler/health         # Get system health status
             └─────────────────────────────────────────────────┘
 ```
 
-### Brain-Inspired Multi-Agent Architecture
+### Simplified Agent Architecture (Current State)
 
 ```
-                              ┌─────────────────────────────────┐
-                              │    SYSTEM AWARENESS LAYER      │
-                              │         (SAL Core)             │
-                              │                                 │
-                              │  ┌─────────────┐ ┌─────────────┐ │
-                              │  │ Event Bus   │ │Message Router│ │
-                              │  └─────────────┘ └─────────────┘ │
-                              │                                 │
-                              │  ┌─────────────┐ ┌─────────────┐ │
-                              │  │Brain State  │ │Coordination │ │
-                              │  │Manager      │ │Engine       │ │
-                              │  └─────────────┘ └─────────────┘ │
-                              └─────────────────────────────────┘
-                                                │
-                              ┌─────────────────┼─────────────────┐
-                              │                 │                 │
-                   ┌──────────▼────────┐  ┌─────▼─────┐  ┌────────▼─────────┐
-                   │   Hippocampus     │  │  Amygdala  │  │    Thalamus      │
-                   │    (Memory)       │  │ (Emotion)  │  │    Router        │
-                   │                   │  │            │  │   (Routing)      │
-                   └───────────────────┘  └────────────┘  └──────────────────┘
-                              │                 │                 │
-                              └─────────────────┼─────────────────┘
-                                                │
-                              ┌─────────────────▼─────────────────┐
-                              │        Prefrontal Cortex          │
-                              │         (Reasoning)               │
-                              └───────────────────────────────────┘
-```
-
-### SAL Communication Flow
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                 SYSTEM AWARENESS LAYER (SAL)                       │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐     │
-│  │  Async Event    │  │   Message       │  │   Brain State    │     │
-│  │     Bus         │  │   Router        │  │   Manager        │     │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘     │
-│            │                        │                        │     │
-│            └────────────────────────┼────────────────────────┘     │
-│                                     │                               │
-│                    ┌────────────────▼────────────────┐              │
-│                    │      Coordination Engine         │              │
-│                    └──────────────────────────────────┘              │
-└─────────────────────────────────────────────────────────────────────┘
-                                      │
-                    ┌─────────────────┼─────────────────┐
-                    │                 │                 │
+                               ┌─────────────────┐
+                               │  Orchestrator   │
+                               │ (Query Router)  │
+                               └─────────────────┘
+                                       │
+                    ┌──────────────────┼──────────────────┐
+                    │                  │                  │
           ┌─────────▼────────┐  ┌─────▼─────┐  ┌────────▼─────────┐
-          │  Agent Events    │  │Coordination│  │   State Updates  │
-          │   & Messages     │  │  Messages  │  │   & Sync         │
+          │   Hippocampus    │  │  Amygdala  │  │    Thalamus      │
+          │   (Core Memory)  │  │ (GGUF AI)  │  │    Router        │
+          │                  │  │            │  │   (Routing)      │
           └──────────────────┘  └────────────┘  └──────────────────┘
+                    │                  │                  │
+                    └──────────────────┼──────────────────┘
+                                       │
+                          ┌────────────▼────────────┐
+                          │     Memory Manager      │
+                          │   (FAISS + SQLite)      │
+                          └─────────────────────────┘
 ```
+
+
 
 ## 🔧 Configuration
 

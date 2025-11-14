@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from typing import Dict, List, Optional, Any
 import sys
 import os
+import asyncio
 from datetime import datetime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -16,7 +17,10 @@ from neural_mesh import NeuralMesh
 from neural_mesh import NeuralMesh
 from sal import SystemAwarenessLayer
 from prompt_manager import PromptManager
-from concept_extractor import SemanticConceptExtractor
+from simple_concept_agent import SimpleConceptAgent
+from memory_agent import SimpleMemoryAgent
+from conversation_learning_agent import ConversationLearningAgent
+from system_awareness_agent import SystemAwarenessAgent
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,14 +40,25 @@ class Orchestrator:
         # Initialize System Awareness Layer (SAL) - disabled for performance
         self.sal = None  # Disabled to reduce overhead
 
-        # Initialize Semantic Concept Extractor
-        self.concept_extractor = SemanticConceptExtractor()
+        # Initialize Simple Concept Agent (replaces complex semantic extractor)
+        self.concept_agent = SimpleConceptAgent()
+
+        # Initialize Simple Memory Agent (background optimization)
+        self.memory_agent = SimpleMemoryAgent(self.memory, self.chat_manager)
+
+        # Initialize Conversation Learning Agent (extracts knowledge from conversations)
+        self.conversation_learner = ConversationLearningAgent(self.memory, self.chat_manager)
 
         # Initialize GGUF model loader
         self.model_loader = GGUFModelLoader()
 
-        # Initialize Prompt Manager (SAL connection will be established later)
-        self.prompt_manager = PromptManager(prompts_dir="backend/prompts", sal=None)  # Don't pass SAL yet
+        # Initialize System Awareness Agent
+        self.awareness_agent = SystemAwarenessAgent(
+            self, self.memory, self.neural_mesh, self.concept_agent, self.model_loader
+        )
+
+        # Disable complex prompt manager for performance - use simple prompts
+        self.prompt_manager = None  # Disabled for performance
 
         # Initialize agents with model integration and prompt manager (SAL connection later)
         self.hippocampus = HippocampusAgent(memory_manager, self.model_loader, self.prompt_manager)
@@ -53,8 +68,8 @@ class Orchestrator:
         self.amygdala = AmygdalaAgent(self.model_loader, self.prompt_manager)
         self.thalamus_router = ThalamusRouter(self.model_loader, self.prompt_manager)
 
-        # Update chat manager with prompt manager
-        self.chat_manager.set_prompt_manager(self.prompt_manager)
+        # Update chat manager with prompt manager (disabled for performance)
+        self.chat_manager.set_prompt_manager(None)
 
         # Legacy agents for compatibility
         self.cortex = None  # Will be handled by routing
@@ -63,7 +78,7 @@ class Orchestrator:
         self.session_context = {}  # Keep for backward compatibility, but prefer chat_manager
 
     async def initialize(self):
-        """Async initialization method to set up SAL connections"""
+        """Async initialization method to set up SAL connections and learning systems"""
         try:
             # Connect PromptManager to SAL
             if self.prompt_manager and self.sal:
@@ -76,7 +91,16 @@ class Orchestrator:
             # Start memory consolidation scheduler
             await self._start_memory_consolidation_scheduler()
 
-            logger.info("Orchestrator fully initialized with memory consolidation (SAL disabled for performance)")
+            # Initialize neural mesh synchronization
+            await self._initialize_learning_sync()
+
+            # Start simple memory agent background tasks
+            await self.memory_agent.run_background_tasks()
+
+            # Start conversation learning agent background tasks
+            await self.conversation_learner.start_background_learning()
+
+            logger.info("Orchestrator fully initialized with active learning systems")
 
         except Exception as e:
             logger.error(f"Orchestrator initialization failed: {e}")
@@ -126,32 +150,57 @@ class Orchestrator:
             # Get session context for continuity
             session_history = self.get_session_context(session_id) if session_id else None
 
-            # Enhanced memory search with top-N and mesh expansion
-            memory_results = self.memory.search_memory(query, top_k=10, use_mesh_expansion=True)
-            memory_chunks = []
-            relevant_memory_chunks = []
+            # Check for continuation requests and enhance query with context
+            if session_history and self._is_continuation_request(query):
+                recent_context = await self._build_continuation_context(session_history, query)
+                if recent_context:
+                    query = f"Context from our recent conversation: {recent_context}\n\nCurrent request: {query}"
 
-            for result in memory_results:
-                chunk = {
-                    "content": result["content"],
-                    "score": result["score"],
-                    "type": result["type"],
-                    "node_id": result["node_id"]
+            # Check if System Awareness Agent can handle this query
+            awareness_result = await self.awareness_agent.process_query(
+                query, session_id or "anonymous", [], {"agent": "unknown", "complexity_score": 0.5}
+            )
+
+            if awareness_result:
+                # System Awareness Agent handled the query - use its result
+                response, metadata = awareness_result
+                agent_result = {
+                    "response": response,
+                    "confidence": 0.9,
+                    "model_used": "system_awareness"
                 }
-                memory_chunks.append(chunk)
+                thought_trace = f"System awareness query processed by {metadata.get('agent_used', 'system_awareness_agent')}"
+                routing_decision = {"agent": "system_awareness_agent", "complexity_score": 0.5}
+                relevant_memory_chunks = []  # Awareness agent doesn't use memory chunks
+                memory_chunks = []  # No memory search needed
+            else:
+                # Normal processing - search memory and route to agents
+                # Simplified memory search - mesh expansion disabled for performance
+                memory_results = self.memory.search_memory(query, top_k=5)  # Reduced from 10, no mesh expansion
+                memory_chunks = []
+                relevant_memory_chunks = []
 
-                # Filter for highly relevant chunks (score > 0.6) to avoid spurious matches
-                if result["score"] > 0.6:
-                    relevant_memory_chunks.append(chunk)
+                for result in memory_results:
+                    chunk = {
+                        "content": result["content"],
+                        "score": result["score"],
+                        "type": result["type"],
+                        "node_id": result["node_id"]
+                    }
+                    memory_chunks.append(chunk)
 
-            # Use Thalamus Router for intelligent model selection
-            routing_decision = await self.thalamus_router.route_query(query, relevant_memory_chunks)
+                    # Filter for highly relevant chunks (score > 0.6) to avoid spurious matches
+                    if result["score"] > 0.6:
+                        relevant_memory_chunks.append(chunk)
 
-            # Route to appropriate agent based on complexity
-            if routing_decision["agent"] == "prefrontal_cortex":
-                # Complex reasoning with Phi-3.1
-                agent_result = await self.prefrontal_cortex.process_complex_query(query, relevant_memory_chunks, session_history)
-                thought_trace = f"""Complex reasoning activated.
+                # Use Thalamus Router for intelligent model selection
+                routing_decision = await self.thalamus_router.route_query(query, relevant_memory_chunks)
+
+                # Route to appropriate agent based on complexity
+                if routing_decision["agent"] == "prefrontal_cortex":
+                    # Complex reasoning with Phi-3.1
+                    agent_result = await self.prefrontal_cortex.process_complex_query(query, relevant_memory_chunks, session_history)
+                    thought_trace = f"""Complex reasoning activated.
 
 Analysis: {agent_result.get('analysis', '')}
 
@@ -159,12 +208,12 @@ Step-by-step reasoning: {agent_result.get('reasoning_steps', '')}
 
 Decision making: Query routed to prefrontal cortex due to complexity score of {routing_decision.get('complexity_score', 0):.2f}. Using Phi-3.1 model for advanced reasoning capabilities."""
 
-            elif routing_decision["agent"] == "amygdala":
-                # Emotional/personality response with Llama-3.2
-                emotional_context = self._analyze_emotional_context(query, session_history)
-                memory_insights = [chunk["content"][:100] for chunk in relevant_memory_chunks[:3]]
-                agent_result = await self.amygdala.generate_personality_response(query, emotional_context, memory_insights)
-                thought_trace = f"""Emotional processing activated.
+                elif routing_decision["agent"] == "amygdala":
+                    # Emotional/personality response with Llama-3.2
+                    emotional_context = self._analyze_emotional_context(query, session_history)
+                    memory_insights = [chunk["content"][:100] for chunk in relevant_memory_chunks[:3]]
+                    agent_result = await self.amygdala.generate_personality_response(query, emotional_context, memory_insights)
+                    thought_trace = f"""Emotional processing activated.
 
 Emotional context analysis: Detected tone '{emotional_context.get('tone', 'neutral')}' with urgency level '{emotional_context.get('urgency', 'normal')}'.
 
@@ -172,44 +221,58 @@ Memory insights considered: {', '.join(memory_insights) if memory_insights else 
 
 Personality response strategy: Using Llama-3.2 model to generate empathetic, conversational response with emotional tone '{agent_result.get('emotional_tone', 'neutral')}'."""
 
-            else:
-                # Standard processing - use Llama-3.2 via Hippocampus for general queries
-                # Generate internal thought process first
-                if self.prompt_manager:
-                    thought_prompt = self.prompt_manager.get_prompt("system.orchestrator.internal_reasoning", query=query)
                 else:
-                    thought_prompt = f"Think step by step about how to answer: {query}\n\nList the key points to cover in plain text:"
-                internal_thought = self.model_loader.generate("llama-3.2", thought_prompt, max_tokens=256, temperature=0.5)
-
-                # Create response using memory context
-                if relevant_memory_chunks:
-                    context = "\n".join([f"Memory: {chunk['content'][:200]}" for chunk in relevant_memory_chunks[:2]])
+                    # Standard processing - use Llama-3.2 via Hippocampus for general queries
+                    # Generate internal thought process first
                     if self.prompt_manager:
-                        prompt = self.prompt_manager.get_prompt("system.orchestrator.contextual_response",
-                                                              context=context, query=query)
+                        thought_prompt = self.prompt_manager.get_prompt("system.orchestrator.internal_reasoning", query=query)
                     else:
-                        prompt = f"Using this context:\n{context}\n\nProvide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose."
-                else:
-                    if self.prompt_manager:
-                        prompt = self.prompt_manager.get_prompt("system.orchestrator.standard_response", query=query)
+                        thought_prompt = f"Think step by step about how to answer: {query}\n\nList the key points to cover in plain text:"
+                    internal_thought = self.model_loader.generate("llama-3.2", thought_prompt, max_tokens=256, temperature=0.5)
+
+                    # Create response using memory context with adaptive prompts
+                    session_id_for_user = session_id or "anonymous"
+                    if relevant_memory_chunks:
+                        context = "\n".join([f"Memory: {chunk['content'][:200]}" for chunk in relevant_memory_chunks[:2]])
+                        if self.prompt_manager:
+                            # Use adaptive prompt selection based on user behavior
+                            prompt, adaptation_metadata = await self.prompt_manager.get_adaptive_prompt(
+                                "system.orchestrator.contextual_response",
+                                session_id_for_user,
+                                query,
+                                context={"memory_context": context, "query": query}
+                            )
+                            logger.debug(f"Selected adaptive prompt variant: {adaptation_metadata.get('selected_variant', 'unknown')}")
+                        else:
+                            prompt = f"Using this context:\n{context}\n\nProvide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose."
                     else:
-                        prompt = f"Provide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose."
+                        if self.prompt_manager:
+                            # Use adaptive prompt for standard responses
+                            prompt, adaptation_metadata = await self.prompt_manager.get_adaptive_prompt(
+                                "system.orchestrator.standard_response",
+                                session_id_for_user,
+                                query,
+                                context={"query": query}
+                            )
+                            logger.debug(f"Selected adaptive prompt variant: {adaptation_metadata.get('selected_variant', 'unknown')}")
+                        else:
+                            prompt = f"Provide a clear, concise explanation of: {query}\n\nKeep your answer informative but not overly verbose."
 
-                response_text = self.model_loader.generate("llama-3.2", prompt, max_tokens=512, temperature=0.6)
-                agent_result = {
-                    "response": response_text,
-                    "confidence": 0.8,
-                    "model_used": "llama-3.2"
-                }
+                    response_text = self.model_loader.generate("llama-3.2", prompt, max_tokens=512, temperature=0.6)
+                    agent_result = {
+                        "response": response_text,
+                        "confidence": 0.8,
+                        "model_used": "llama-3.2"
+                    }
 
-                memory_context_info = ""
-                if relevant_memory_chunks:
-                    memory_context_info = f"\n\nMemory context retrieved: {len(relevant_memory_chunks)} relevant chunks found with scores ranging from {min([c['score'] for c in relevant_memory_chunks]):.2f} to {max([c['score'] for c in relevant_memory_chunks]):.2f}"
+                    memory_context_info = ""
+                    if relevant_memory_chunks:
+                        memory_context_info = f"\n\nMemory context retrieved: {len(relevant_memory_chunks)} relevant chunks found with scores ranging from {min([c['score'] for c in relevant_memory_chunks]):.2f} to {max([c['score'] for c in relevant_memory_chunks]):.2f}"
 
-                # Clean up markdown formatting from internal thought
-                cleaned_thought = internal_thought.strip().replace('**', '').replace('*', '')
+                    # Clean up markdown formatting from internal thought
+                    cleaned_thought = internal_thought.strip().replace('**', '').replace('*', '')
 
-                thought_trace = f"""Internal reasoning: {cleaned_thought}
+                    thought_trace = f"""Internal reasoning: {cleaned_thought}
 
 Query routing: Complexity score {routing_decision.get('complexity_score', 0):.2f} determined standard processing appropriate.{memory_context_info}
 
@@ -218,11 +281,12 @@ Response generation: Created helpful response using memory-augmented context and
             # Extract memory node IDs for reinforcement
             memory_node_ids = [chunk["node_id"] for chunk in memory_chunks]
 
-            # Apply reinforcement learning via memory consolidation system
-            if memory_node_ids:
-                confidence = agent_result.get("confidence", 0.5)
-                self._apply_memory_reinforcement(memory_node_ids, confidence, query, agent_result["response"],
-                                               session_id, session_history)
+            # TEMPORARILY DISABLED: Reinforcement learning causing freezes
+            # TODO: Replace with simple background Memory Optimization Agent
+            # if memory_node_ids:
+            #     confidence = agent_result.get("confidence", 0.5)
+            #     self._apply_memory_reinforcement(memory_node_ids, confidence, query, agent_result["response"],
+            #                                    session_id, session_history)
 
             # Publish query completion event to SAL for coordination
             if self.sal:
@@ -259,9 +323,14 @@ Response generation: Created helpful response using memory-augmented context and
 
             # Store conversation in persistent storage
             if session_id:
-                # Check if this is the first message in the session
+                # Check if session exists, create if it doesn't
                 session_info = self.chat_manager.get_session_info(session_id)
-                is_first_message = session_info and session_info["message_count"] == 0
+                if not session_info:
+                    # Create new session with the provided session_id
+                    self.chat_manager.create_chat_session(session_id)
+                    session_info = {"message_count": 0}
+
+                is_first_message = session_info["message_count"] == 0
 
                 # Generate smart title for new sessions
                 if is_first_message:
@@ -281,6 +350,11 @@ Response generation: Created helpful response using memory-augmented context and
                     content=agent_result["response"],
                     thought_trace=thought_trace,
                     memory_stats=self.memory.get_memory_stats()
+                )
+
+                # Trigger conversation learning in background
+                asyncio.create_task(
+                    self.conversation_learner.analyze_recent_conversation(session_id)
                 )
 
             return {
@@ -404,6 +478,36 @@ Response generation: Created helpful response using memory-augmented context and
                 "timestamp": msg["timestamp"]
             })
         return context
+
+    def _is_continuation_request(self, query: str) -> bool:
+        """Check if query is asking for more information or continuation."""
+        continuation_patterns = [
+            'more details', 'tell me more', 'expand on', 'explain more',
+            'elaborate', 'give me more', 'continue', 'what else'
+        ]
+        query_lower = query.lower()
+        return any(pattern in query_lower for pattern in continuation_patterns)
+
+    async def _build_continuation_context(self, session_history: List[Dict], current_query: str) -> Optional[str]:
+        """Build context from recent conversation for continuation requests."""
+        if not session_history or len(session_history) < 2:
+            return None
+
+        # Get the last Q&A pair (most recent conversation)
+        recent_messages = session_history[-4:]  # Last 2 exchanges
+
+        context_parts = []
+
+        for msg in recent_messages:
+            if 'query' in msg:
+                context_parts.append(f"User asked: {msg['query']}")
+            elif 'response' in msg:
+                context_parts.append(f"AI responded: {msg['response'][:300]}...")  # Truncate long responses
+
+        if context_parts:
+            return " ".join(context_parts)
+
+        return None
 
     def _apply_memory_reinforcement(self, memory_node_ids: List[str], confidence: float,
                                    user_query: str, ai_response: str, session_id: Optional[str] = None,
@@ -570,3 +674,37 @@ Response generation: Created helpful response using memory-augmented context and
         # Start the background worker
         asyncio.create_task(consolidation_worker())
         logger.info("Memory consolidation scheduler started")
+
+    async def _initialize_learning_sync(self):
+        """
+        Initialize neural mesh and database synchronization for learning systems.
+        """
+        try:
+            # Perform initial synchronization
+            sync_result = self.memory.neural_mesh_bridge.force_full_sync()
+            logger.info(f"Initial learning synchronization completed: {sync_result}")
+
+            # Start periodic synchronization
+            asyncio.create_task(self._learning_sync_scheduler())
+
+        except Exception as e:
+            logger.error(f"Failed to initialize learning sync: {e}")
+
+    async def _learning_sync_scheduler(self):
+        """
+        Periodic synchronization scheduler for learning systems.
+        """
+        while True:
+            try:
+                await asyncio.sleep(300)  # Sync every 5 minutes
+
+                # Check if sync is needed
+                sync_status = self.memory.neural_mesh_bridge.get_sync_status()
+                if sync_status.get('needs_sync', False):
+                    logger.info("Performing periodic learning synchronization...")
+                    sync_result = self.memory.neural_mesh_bridge.sync_mesh_to_database()
+                    logger.debug(f"Periodic sync completed: {sync_result}")
+
+            except Exception as e:
+                logger.error(f"Error in learning sync scheduler: {e}")
+                await asyncio.sleep(60)  # Wait before retrying

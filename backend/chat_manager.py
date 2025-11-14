@@ -57,13 +57,14 @@ class ChatManager:
 
             conn.commit()
 
-    def create_chat_session(self, title: Optional[str] = None) -> str:
+    def create_chat_session(self, session_id: Optional[str] = None, title: Optional[str] = None) -> str:
         """Create a new chat session and return its ID."""
-        session_id = str(uuid.uuid4())
+        if session_id is None:
+            session_id = str(uuid.uuid4())
 
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                'INSERT INTO chat_sessions (id, title) VALUES (?, ?)',
+                'INSERT OR IGNORE INTO chat_sessions (id, title) VALUES (?, ?)',
                 (session_id, title)
             )
             conn.commit()
@@ -84,30 +85,56 @@ class ChatManager:
             title = self.model_loader.generate(
                 "llama-3.2",
                 prompt,
-                max_tokens=20,
-                temperature=0.3
+                max_tokens=15,  # Reduced from 20
+                temperature=0.2  # Reduced for more consistent output
             ).strip()
 
-            # Clean up the title
+            # Clean up the title - remove quotes, extra whitespace, and common prefixes
             title = title.strip('"').strip("'").strip()
+            title = title.lstrip('Title:').lstrip('Topic:').lstrip('Subject:').strip()
 
-            # Fallback if generation fails or is too long
-            if not title or len(title) > 50:
-                # Truncate the original query
-                words = first_query.split()[:4]
-                title = " ".join(words)
-                if len(title) > 30:
-                    title = title[:27] + "..."
+            # Validate the generated title
+            if not title or len(title) > 40 or len(title.split()) > 6:
+                # Fallback to simple extraction
+                title = self._extract_simple_title(first_query)
 
             return title
 
         except Exception as e:
-            # Fallback to simple truncation
-            words = first_query.split()[:4]
-            title = " ".join(words)
-            if len(title) > 30:
-                title = title[:27] + "..."
-            return title
+            # Fallback to simple extraction
+            return self._extract_simple_title(first_query)
+
+    def _extract_simple_title(self, query: str) -> str:
+        """Extract a simple, clean title from a query."""
+        # Remove common question words and punctuation
+        query = query.lower().strip()
+        query = query.replace('?', '').replace('!', '').replace('.', '')
+
+        # Remove common prefixes
+        prefixes_to_remove = ['what', 'how', 'why', 'when', 'where', 'who', 'can you', 'tell me', 'explain', 'describe']
+        words = query.split()
+
+        # Remove prefix words
+        while words and words[0] in prefixes_to_remove:
+            words.pop(0)
+
+        # Take first 4-6 meaningful words
+        if not words:
+            return "General Inquiry"
+
+        # Capitalize first letter of each word
+        title_words = []
+        for word in words[:5]:  # Take up to 5 words
+            if len(word) > 2:  # Skip very short words
+                title_words.append(word.capitalize())
+
+        title = " ".join(title_words)
+
+        # Ensure reasonable length
+        if len(title) > 35:
+            title = title[:32] + "..."
+
+        return title or "Chat Inquiry"
 
     def add_message(self, session_id: str, role: str, content: str,
                    thought_trace: Optional[str] = None,

@@ -18,10 +18,13 @@ class GGUFModelLoader:
 
     def __init__(self):
         self.models = {}  # Cache loaded models
+
+        # Use absolute path to models directory (relative to project root, not backend/)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.model_paths = {
-            "phi-3.1": os.path.join("models", "Phi-3.1-mini-128k-instruct-Q4_K_M.gguf"),
-            "hermes": os.path.join("models", "Hermes-3-Llama-3.2-3B.Q4_K_M.gguf"),
-            "llama-3.2": os.path.join("models", "llama-3.2-1b-instruct-q4_k_m.gguf")
+            "phi-3.1": os.path.join(project_root, "models", "Phi-3.1-mini-128k-instruct-Q4_K_M.gguf"),
+            "hermes": os.path.join(project_root, "models", "Hermes-3-Llama-3.2-3B.Q4_K_M.gguf"),
+            "llama-3.2": os.path.join(project_root, "models", "llama-3.2-1b-instruct-q4_k_m.gguf")
         }
 
     def load_model(self, model_name: str):

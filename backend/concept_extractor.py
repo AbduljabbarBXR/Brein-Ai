@@ -421,10 +421,17 @@ class SemanticConceptExtractor:
         # Add to semantic graph
         self.concept_graph.add_node(concept_id, name=representative, importance=0.5)
 
-        # Add context if provided
+        # Add context if provided (sanitized to prevent serialization issues)
         if context:
+            # Sanitize context to avoid storing large conversation histories
+            sanitized_context = {
+                'session_id': context.get('session_id'),
+                'emotional_tone': context.get('emotional_context', {}).get('tone'),
+                'conversation_length': len(context.get('conversation_history', [])),
+                'has_history': bool(context.get('conversation_history'))
+            }
             self.concept_contexts[concept_id].append({
-                'context': context,
+                'context': sanitized_context,
                 'timestamp': datetime.now(),
                 'memory_id': memory_id
             })
@@ -455,10 +462,17 @@ class SemanticConceptExtractor:
         updated_embedding = (current_embedding * concept['frequency'] + new_centroid) / (concept['frequency'] + 1)
         self.concept_embeddings[concept_id] = updated_embedding
 
-        # Add context
+        # Add context (sanitized to prevent serialization issues)
         if context:
+            # Sanitize context to avoid storing large conversation histories
+            sanitized_context = {
+                'session_id': context.get('session_id'),
+                'emotional_tone': context.get('emotional_context', {}).get('tone'),
+                'conversation_length': len(context.get('conversation_history', [])),
+                'has_history': bool(context.get('conversation_history'))
+            }
             self.concept_contexts[concept_id].append({
-                'context': context,
+                'context': sanitized_context,
                 'timestamp': datetime.now(),
                 'memory_id': memory_id
             })

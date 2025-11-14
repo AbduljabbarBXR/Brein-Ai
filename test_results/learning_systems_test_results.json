@@ -1,0 +1,68 @@
+{
+  "status": "PASSED",
+  "timestamp": "2025-11-13T23:28:24.171852",
+  "test_summary": {
+    "total_tests": 6,
+    "passed_tests": 6,
+    "failed_tests": 0,
+    "success_rate": 1.0
+  },
+  "individual_tests": {
+    "hebbian_learning": {
+      "status": "PASSED",
+      "connection_strength": 0.5,
+      "reinforcement_count": 0,
+      "duration": 0.1581742763519287
+    },
+    "memory_consolidation": {
+      "status": "PASSED",
+      "initial_nodes": 8,
+      "nodes_decayed": 8,
+      "consolidation_actions": 0,
+      "final_health_score": 0.5998000000000001,
+      "duration": 133.05980587005615
+    },
+    "reinforcement_learning": {
+      "status": "PASSED",
+      "reinforced_nodes": 3,
+      "avg_activation": 0.66,
+      "avg_importance": 0.5800000000000001,
+      "avg_consolidation": 0.04000000000000001,
+      "duration": 0.11349987983703613
+    },
+    "database_synchronization": {
+      "status": "PASSED",
+      "synced_nodes": 13,
+      "synced_connections": 0,
+      "db_nodes_found": 2,
+      "log_entries": 0,
+      "duration": 0.07865214347839355
+    },
+    "learning_health_monitoring": {
+      "status": "PASSED",
+      "health_score": 0.6412307692307693,
+      "total_nodes": 13,
+      "sync_health": 1.0,
+      "needs_sync": false,
+      "duration": 0.0025115013122558594
+    },
+    "end_to_end_learning": {
+      "status": "PASSED",
+      "content_nodes_created": 3,
+      "reinforcement_applied": 3,
+      "sync_completed": 16,
+      "final_activation": 0.6,
+      "final_importance": 0.59,
+      "final_consolidation": 0.055000000000000014,
+      "duration": 0.12504982948303223
+    }
+  },
+  "system_health": {
+    "status": "EXCELLENT",
+    "description": "All learning systems functioning perfectly",
+    "success_rate": 1.0,
+    "recommendations": [
+      "All learning systems healthy - continue monitoring"
+    ]
+  }
+}
